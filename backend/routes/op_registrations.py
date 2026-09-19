@@ -1,0 +1,261 @@
+from datetime import date
+from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required, get_jwt_identity
+from db import query
+from utils import next_code, log_audit
+
+op_reg_bp = Blueprint("op_registrations", __name__)
+
+
+def blank_to_none(v):
+    if v is None:
+        return None
+    if isinstance(v, str) and v.strip() == "":
+        return None
+    return v
+
+
+def safe_date(v):
+    """Convert any input to YYYY-MM-DD or None."""
+    if not v:
+        return None
+    if isinstance(v, str) and len(v) == 10 and v[4] == "-" and v[7] == "-":
+        return v
+    try:
+        from datetime import datetime
+
+        for fmt in (
+            "%Y-%m-%d",
+            "%d/%m/%Y",
+            "%m/%d/%Y",
+            "%a, %d %b %Y %H:%M:%S %Z",
+            "%a, %d %b %Y",
+        ):
+            try:
+                d = datetime.strptime(v, fmt)
+                return d.date().isoformat()
+            except ValueError:
+                continue
+        try:
+            from dateutil import parser
+
+            d = parser.parse(v)
+            return d.date().isoformat()
+        except:
+            pass
+    except:
+        pass
+    return None
+
+
+def calc_age(dob_str):
+    if not dob_str:
+        return None
+    dob_str = safe_date(dob_str)
+    if not dob_str:
+        return None
+    y, m, d = map(int, dob_str.split("-"))
+    today = date.today()
+    return today.year - y - ((today.month, today.day) < (m, d))
+
+
+def next_token_for_today():
+    row = query(
+        """
+        SELECT COUNT(*) c FROM op_registrations WHERE DATE(created_at) = CURDATE()
+        """
+    )
+    return (row["c"] or 0) + 1
+
+
+@op_reg_bp.route("", methods=["POST"])
+@jwt_required()
+def create_op_registration():
+    d = request.get_json()
+    if not d.get("first_name") or not d.get("mobile") or not d.get("gender"):
+        return jsonify({"error": "first_name, mobile and gender are required"}), 400
+
+    village = blank_to_none(d.get("village"))
+    district = blank_to_none(d.get("district"))
+    if not village or not district:
+        return jsonify({"error": "village and district are required"}), 400
+
+    user_id = get_jwt_identity()
+    full_name = f"{d.get('title', '')} {d.get('first_name')} {d.get('last_name', '')}".strip()
+
+    dob = blank_to_none(d.get("dob"))
+    dob = safe_date(dob)
+    age = calc_age(dob)
+    mandal = blank_to_none(d.get("mandal"))
+    state = blank_to_none(d.get("state"))
+    pincode = blank_to_none(d.get("pincode"))
+
+    existing = query(
+        "SELECT * FROM patients WHERE phone=%s ORDER BY id DESC LIMIT 1", (d["mobile"],)
+    )
+    if existing:
+        patient_id = existing["id"]
+        patient_uid = existing["patient_uid"]
+    else:
+        patient_uid = next_code("PT", "patients", "patient_uid")
+        reg_no = next_code("SGR", "patients", "reg_no")
+        patient_id = query(
+            """
+            INSERT INTO patients (
+                patient_uid, reg_no, name, gender, dob, age, blood_group, email, phone,
+                alt_phone, aadhar_number, occupation, street, village, mandal, district,
+                state, pincode, guardian_name, guardian_relation, guardian_phone, created_by
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            """,
+            (
+                patient_uid,
+                reg_no,
+                full_name,
+                d.get("gender"),
+                dob,
+                age,
+                blank_to_none(d.get("blood_group")),
+                blank_to_none(d.get("email")),
+                d.get("mobile"),
+                blank_to_none(d.get("alt_phone")),
+                blank_to_none(d.get("aadhar_number")),
+                blank_to_none(d.get("occupation")),
+                blank_to_none(d.get("street_address")),
+                village,
+                mandal,
+                district,
+                state,
+                pincode,
+                blank_to_none(d.get("guardian_name")),
+                blank_to_none(d.get("guardian_relation")),
+                blank_to_none(d.get("guardian_mobile")),
+                user_id,
+            ),
+            fetch=False,
+            commit=True,
+        )
+
+    opd_reg_no = next_code("OP", "op_registrations", "opd_reg_no")  # changed from OPD
+    token_no = next_token_for_today()
+
+    appointment_date = safe_date(d.get("appointment_date"))
+
+    rid = query(
+        """
+        INSERT INTO op_registrations (
+            patient_id, opd_reg_no, token_no, title, first_name, last_name, gender, dob,
+            email, mobile, alt_phone, aadhar_number, visit_type, guardian_relation,
+            guardian_name, guardian_mobile, street_address, village, mandal, district,
+            state, pincode, doctor_id, consultation_fee,
+            referral_type, referral_doctor_name, appointment_date, appointment_time,
+            payment_mode, registration_fee, abha_number, occupation, blood_group, mlc,
+            booking_type, created_by
+        ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """,
+        (
+            patient_id,
+            opd_reg_no,
+            token_no,
+            blank_to_none(d.get("title")),
+            d.get("first_name"),
+            blank_to_none(d.get("last_name")),
+            d.get("gender"),
+            dob,
+            blank_to_none(d.get("email")),
+            d.get("mobile"),
+            blank_to_none(d.get("alt_phone")),
+            blank_to_none(d.get("aadhar_number")),
+            d.get("visit_type", "General"),
+            blank_to_none(d.get("guardian_relation")),
+            blank_to_none(d.get("guardian_name")),
+            blank_to_none(d.get("guardian_mobile")),
+            blank_to_none(d.get("street_address")),
+            village,
+            mandal,
+            district,
+            state,
+            pincode,
+            blank_to_none(d.get("doctor_id")),
+            d.get("consultation_fee", 0) or 0,
+            d.get("referral_type", "Walkin"),
+            blank_to_none(d.get("referral_doctor_name")),
+            appointment_date,
+            blank_to_none(d.get("appointment_time")),
+            d.get("payment_mode", "Cash"),
+            d.get("registration_fee", 0) or 0,
+            blank_to_none(d.get("abha_number")),
+            blank_to_none(d.get("occupation")),
+            blank_to_none(d.get("blood_group")),
+            int(bool(d.get("mlc"))),
+            d.get("booking_type", "Walk-in"),
+            user_id,
+        ),
+        fetch=False,
+        commit=True,
+    )
+
+    log_audit(user_id, "CREATE", "OP Registration", rid)
+    row = query(
+        """
+        SELECT r.*, p.patient_uid AS mr_number, p.reg_no AS patient_reg_no, doc.name AS doctor_name
+        FROM op_registrations r
+        JOIN patients p ON p.id = r.patient_id
+        LEFT JOIN doctors doc ON doc.id = r.doctor_id
+        WHERE r.id=%s
+        """,
+        (rid,),
+    )
+    return jsonify(row), 201
+
+
+# =============================================================================
+# UPDATED list endpoint with patient_id filter
+# =============================================================================
+@op_reg_bp.route("", methods=["GET"])
+@jwt_required()
+def list_op_registrations():
+    search = request.args.get("search", "")
+    patient_id = request.args.get("patient_id")  # NEW: filter by patient ID
+    like = f"%{search}%"
+
+    sql = """
+        SELECT r.id, p.patient_uid AS mr_number, p.reg_no AS patient_reg_no, r.opd_reg_no,
+               r.token_no, CONCAT(r.first_name,' ',IFNULL(r.last_name,'')) AS name,
+               r.mobile, r.gender, TIMESTAMPDIFF(YEAR, r.dob, CURDATE()) AS age,
+               doc.name AS doctor_name, r.referral_type, r.appointment_time,
+               r.consultation_fee, r.booking_type, r.status, r.created_at,
+               p.id AS patient_id
+        FROM op_registrations r
+        JOIN patients p ON p.id = r.patient_id
+        LEFT JOIN doctors doc ON doc.id = r.doctor_id
+        WHERE 1=1
+    """
+    params = []
+
+    if patient_id:
+        sql += " AND p.id = %s"
+        params.append(patient_id)
+
+    if search:
+        sql += " AND (r.first_name LIKE %s OR r.mobile LIKE %s OR p.patient_uid LIKE %s OR r.opd_reg_no LIKE %s)"
+        params.extend([like, like, like, like])
+
+    sql += " ORDER BY r.id DESC"
+    rows = query(sql, tuple(params), many=True)
+    return jsonify(rows)
+
+
+@op_reg_bp.route("/patient/<int:patient_id>/last", methods=["GET"])
+@jwt_required()
+def get_last_op_registration(patient_id):
+    row = query(
+        """
+        SELECT r.*, doc.name AS doctor_name
+        FROM op_registrations r
+        LEFT JOIN doctors doc ON doc.id = r.doctor_id
+        WHERE r.patient_id = %s
+        ORDER BY r.created_at DESC LIMIT 1
+        """,
+        (patient_id,),
+    )
+    return jsonify(row) if row else jsonify(None), 200

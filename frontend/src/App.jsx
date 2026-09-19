@@ -1,0 +1,319 @@
+import { Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider } from './context/AuthContext'
+import ProtectedRoute from './components/ProtectedRoute'
+import Layout from './components/Layout'
+import ComingSoon from './pages/ComingSoon'
+
+import Login from './pages/auth/Login'
+
+import SuperAdminDashboard from './pages/superadmin/Dashboard'
+import UserManagement from './pages/superadmin/UserManagement'
+
+import AdminDashboard from './pages/admin/Dashboard'
+import AdminBillingManagement from './pages/admin/BillingManagement'
+
+import ExecutiveDashboard from './pages/executive/Dashboard'
+import ExecutiveBillingModifications from './pages/executive/BillingModifications'
+import OutPatientList from './pages/executive/OutPatientList'
+import InPatientList from './pages/executive/InPatientList'
+import PatientRecords from './pages/executive/PatientRecords'
+import PatientRegistration from './pages/executive/PatientRegistration'
+import Appointments from './pages/executive/Appointments'
+import Admission from './pages/executive/Admission'
+import OPBilling from './pages/executive/OPBilling'
+import IPBilling from './pages/executive/IPBilling'
+import PatientStatus from './pages/executive/PatientStatus'
+import RoomTransferApproval from './pages/executive/RoomTransferApproval'
+import RoomOccupation from './pages/executive/RoomOccupation'
+import DirectServices from './pages/executive/DirectServices'
+import AdvancePayment from './pages/executive/AdvancePayment'
+import AdvancePaymentDetail from './pages/executive/AdvancePaymentDetail'
+import IPDetails from './pages/executive/IPDetails'
+import IPLabReport from './pages/executive/reports/IPLabReport'
+import OPLabReport from './pages/executive/reports/OPLabReport'
+import IPRadiologyReport from './pages/executive/reports/IPRadiologyReport'
+import OPRadiologyReport from './pages/executive/reports/OPRadiologyReport'
+
+import IPLabPage from './pages/executive/IPLabPage'
+import IPServicesPage from './pages/executive/IPServicesPage'
+import IPProceduresPage from './pages/executive/IPProceduresPage'
+
+import PharmacyLayout from './components/pharmacy/PharmacyLayout'
+import PharmacyDashboard from './pages/pharmacy/Dashboard'
+import PharmacyComingSoon from './pages/pharmacy/ComingSoon'
+import InpatientSales from './pages/pharmacy/InpatientSales'
+import OutpatientSales from './pages/pharmacy/OutpatientSales'
+import PatientIndents from './pages/pharmacy/PatientIndents'
+import OTIndents from './pages/pharmacy/OTIndents'
+import DischargeSummary from './pages/executive/DischargeSummary'
+import OPLabPage from './pages/executive/OPLabPage'
+import OPServicesPage from './pages/executive/OPServicesPage'
+import OPProceduresPage from './pages/executive/OPProceduresPage'
+import GoodsReceiveNote from './pages/pharmacy/GoodsReceiveNote'
+import StockAdjustments from './pages/pharmacy/StockAdjustments'
+import SupplierMaster from './pages/pharmacy/SupplierMaster'
+import DoctorMaster from './pages/superadmin/DoctorMaster'
+import PermissionProfiles from './pages/superadmin/PermissionProfiles'
+import LabLayout from './components/lab/LabLayout'
+import LabDashboard from './pages/lab/Dashboard'
+import OPReports from './pages/lab/OPReports'
+import IPReports from './pages/lab/IPReports'
+import LabTests from './pages/superadmin/LabTests'
+import BulkImport from './pages/superadmin/BulkImport'
+function withLayout(el) {
+  return <Layout>{el}</Layout>
+}
+function withPharmacyLayout(el) {
+  return <PharmacyLayout>{el}</PharmacyLayout>
+}
+
+// Executive-side pages: executive, admin, and super_admin can all reach these.
+const EXEC_ROLES = ['executive', 'admin', 'super_admin']
+
+// Pharmacy-side pages: the dedicated pharmacy role, plus admin and
+// super_admin (per your requirement — admin/superadmin see everything).
+// 'executive' is deliberately NOT included, so an executive user has no
+// route access to /pharmacy/* even by typing the URL directly.
+const PHARMACY_ROLES = ['pharmacy', 'admin', 'super_admin']
+
+const PLACEHOLDERS = [
+  ['Inpatient Dashboard', '/executive/inpatient-dashboard'],
+  ['Outpatient Dashboard', '/executive/outpatient-dashboard'],
+  ['Advance Payment', '/executive/advance-payment'],
+  ['New Discharge Summary', '/executive/new-discharge-summary'],
+  ['Billing Summary', '/executive/billing-summary'],
+  ['Referral Doctor', '/executive/referral-doctor'],
+]
+
+const PHARMACY_PLACEHOLDERS = [
+  ['Inventory Type', '/pharmacy/masters/inventory-type'],
+  ['Item Type', '/pharmacy/masters/item-type'],
+  ['Manufacturer', '/pharmacy/masters/manufacturer'],
+  ['Tax Categories', '/pharmacy/masters/tax-categories'],
+  ['Rack Master', '/pharmacy/masters/rack-master'],
+  ['Item Master', '/pharmacy/masters/item-master'],
+  ['Item Package Master', '/pharmacy/masters/item-package-master'],
+  ['Drug Combination', '/pharmacy/masters/drug-combination'],
+  ['Purchase Order', '/pharmacy/transaction/purchase-order'],
+  ['Stock Returns', '/pharmacy/transaction/stock-returns'],
+  ['Inpatient Sales Returns', '/pharmacy/sales-returns/inpatient'],
+  ['Outpatient Sales Returns', '/pharmacy/sales-returns/outpatient'],
+  ['Duplicate Invoice', '/pharmacy/duplicate-invoice'],
+  ['Total Dues', '/pharmacy/reports/total-dues'],
+  ['Due Reported Sales', '/pharmacy/reports/due-reported-sales'],
+  ['Sales Returns Report', '/pharmacy/reports/sales-returns'],
+  ['OP/IP Sales Report', '/pharmacy/reports/op-ip-sales'],
+  ['OP/IP Due Report', '/pharmacy/reports/op-ip-due'],
+  ['Pharmacy Report', '/pharmacy/reports/pharmacy'],
+  ['Sales Report', '/pharmacy/reports/sales'],
+  ['Due Collections', '/pharmacy/due-collections'],
+  ['Stock', '/pharmacy/stock'],
+  ['Expenses', '/pharmacy/expenses'],
+]
+
+const MASTER_PLACEHOLDERS = [
+  ['Specialization', '/superadmin/specializations'],
+  ['Referral Marketing', '/superadmin/referral-marketing'],
+  ['Company', '/superadmin/companies'],
+  ['Discharge Form', '/superadmin/discharge-forms'],
+  ['Procedures', '/superadmin/procedures'],
+  ['Lab Test Category', '/superadmin/lab-test-categories'],
+  ['Lab Test Attributes', '/superadmin/lab-test-attributes'],
+  ['Lab Tests', '/superadmin/lab-tests'],
+  ['Lab Packages', '/superadmin/lab-packages'],
+  ['Lab Vendor', '/superadmin/lab-vendors'],
+  ['Radiology', '/superadmin/radiology'],
+  ['Radiology Departments', '/superadmin/radiology-departments'],
+  ['Floors', '/superadmin/floors'],
+  ['Rooms', '/superadmin/rooms'],
+  ['Room Types', '/superadmin/room-types'],
+  ['Equipment', '/superadmin/equipment'],
+  ['Operation Theatre', '/superadmin/operation-theatres'],
+  ['Insurance', '/superadmin/insurance'],
+  ['File Upload', '/superadmin/file-upload'],
+  ['Services', '/superadmin/services'],
+  ['Certificates', '/superadmin/certificates'],
+  ['Master Refund Request Reason', '/superadmin/refund-reasons'],
+]
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+
+        {/* Super Admin */}
+        <Route path="/superadmin/dashboard" element={
+          <ProtectedRoute roles={['super_admin']}>{withLayout(<SuperAdminDashboard />)}</ProtectedRoute>
+        } />
+        <Route path="/superadmin/users" element={
+          <ProtectedRoute roles={['super_admin']}>{withLayout(<UserManagement />)}</ProtectedRoute>
+        } />
+
+        {/* Admin */}
+        <Route path="/admin/dashboard" element={
+          <ProtectedRoute roles={['admin', 'super_admin']}>{withLayout(<AdminDashboard />)}</ProtectedRoute>
+        } />
+        <Route path="/admin/billing" element={
+          <ProtectedRoute roles={['admin', 'super_admin']}>{withLayout(<AdminBillingManagement />)}</ProtectedRoute>
+        } />
+
+        {/* Executive */}
+        <Route path="/executive/dashboard" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<ExecutiveDashboard />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/billing-modifications" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<ExecutiveBillingModifications />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/patient-registration" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<PatientRegistration />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/appointments" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<Appointments />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/admission" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<Admission />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/op-billing" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPBilling />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/ip-billing" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPBilling />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/out-patients" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OutPatientList />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/in-patients" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<InPatientList />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/patient-records" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<PatientRecords />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/direct-services" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<DirectServices />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/room-occupation" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<RoomOccupation />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/room-transfer-approval" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<RoomTransferApproval />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/patient-status" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<PatientStatus />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/ip-advance" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<AdvancePayment />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/ip-advance/:id" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<AdvancePaymentDetail />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/ip-details" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPDetails />)}</ProtectedRoute>
+        } />
+
+        <Route path="/executive/ip-lab" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPLabPage />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/ip-services" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPServicesPage />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/ip-procedures" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPProceduresPage />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/discharge-summary/:id?" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<DischargeSummary />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/op-lab" element={
+  <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPLabPage />)}</ProtectedRoute>
+} />
+<Route path="/executive/op-services" element={
+  <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPServicesPage />)}</ProtectedRoute>
+} />
+<Route path="/executive/op-procedures" element={
+  <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPProceduresPage />)}</ProtectedRoute>
+} />
+
+        {/* Reports */}
+        <Route path="/executive/reports/ip-lab" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPLabReport />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/reports/op-lab" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPLabReport />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/reports/ip-radiology" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<IPRadiologyReport />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/reports/op-radiology" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPRadiologyReport />)}</ProtectedRoute>
+        } />
+
+        {/* Pharmacy */}
+        <Route path="/pharmacy/dashboard" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyDashboard />)}</ProtectedRoute>
+        } />
+        {PHARMACY_PLACEHOLDERS.map(([label, path]) => (
+          <Route key={path} path={path} element={
+            <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyComingSoon title={label} />)}</ProtectedRoute>
+          } />
+        ))}
+        <Route path="/pharmacy/sales/inpatient" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InpatientSales />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/sales/outpatient" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OutpatientSales />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/sales/patient-indents" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PatientIndents />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/sales/ot-indents" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OTIndents />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/transaction/goods-receive-note" element={
+  <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GoodsReceiveNote />)}</ProtectedRoute>
+} />
+<Route path="/pharmacy/transaction/stock-adjustments" element={
+  <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockAdjustments />)}</ProtectedRoute>
+} />
+<Route path="/pharmacy/masters/supplier" element={
+  <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SupplierMaster />)}</ProtectedRoute>
+} />
+<Route path="/superadmin/doctors" element={
+  <ProtectedRoute roles={['super_admin']}>{withLayout(<DoctorMaster />)}</ProtectedRoute>
+} />
+<Route path="/superadmin/permission-profiles" element={
+  <ProtectedRoute roles={['super_admin']}>{withLayout(<PermissionProfiles />)}</ProtectedRoute>
+} />
+
+{/* Lab Technician Routes */}
+<Route path="/lab" element={<LabLayout />}>
+  <Route index element={<Navigate to="/lab/dashboard" replace />} />
+  <Route path="dashboard" element={
+    <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><LabDashboard /></ProtectedRoute>
+  } />
+  <Route path="op-reports" element={
+    <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><OPReports /></ProtectedRoute>
+  } />
+  <Route path="ip-reports" element={
+    <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><IPReports /></ProtectedRoute>
+  } />
+</Route>
+<Route path="/superadmin/lab-tests" element={
+  <ProtectedRoute roles={['super_admin']}>{withLayout(<LabTests />)}</ProtectedRoute>
+} />
+<Route path="/superadmin/bulk-import" element={
+  <ProtectedRoute roles={['super_admin']}>{withLayout(<BulkImport />)}</ProtectedRoute>
+} />
+
+        {/* Placeholders */}
+        {PLACEHOLDERS.map(([label, path]) => (
+          <Route key={path} path={path} element={
+            <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<ComingSoon title={label} />)}</ProtectedRoute>
+          } />
+        ))}
+
+        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </AuthProvider>
+  )
+}
