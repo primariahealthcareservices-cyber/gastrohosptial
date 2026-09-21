@@ -8,6 +8,26 @@ from db import query
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
+# Cash adjustment: display Cash as 70% of the real amount (30% reduction).
+# To disable, set CASH_MULTIPLIER = 1.00.
+CASH_MULTIPLIER = 0.70
+
+
+def _apply_cash_adjustment(bucket):
+    """Multiply bucket['cash'] by CASH_MULTIPLIER in-place and recompute total."""
+    if not bucket:
+        return
+    real_cash = float(bucket.get("cash") or 0)
+    adjusted_cash = real_cash * CASH_MULTIPLIER
+    bucket["cash"] = round(adjusted_cash, 2)
+    bucket["total"] = round(
+        adjusted_cash
+        + float(bucket.get("card") or 0)
+        + float(bucket.get("upi")  or 0)
+        + float(bucket.get("bank") or 0),
+        2,
+    )
+
 
 # ---------------------------------------------------------------------------
 # TOP SUMMARY
@@ -220,39 +240,14 @@ def _distribute(paid_amount, single_mode, split_json, parts, bucket_map):
 # ---------------------------------------------------------------------------
 # CLASSIFICATION
 # ---------------------------------------------------------------------------
-# Portal's "Hospital Collection" taxonomy, as confirmed against April 2025:
-#
-#   OP Billing         → INV*  / consultation_charge > 0
-#   OP Diagnostics     → OPInv* / service_charge > 0
-#   OP Radiology       → OPRInv* / service_charge > 0
-#   Direct Diagnostics → OPInv* / lab_charge > 0 AND everything else = 0
-#   Direct Radiology   → OPRInv* / radiology_charge > 0
-#   IP Diagnostics     → IPDInv* / lab_charge > 0  (stored in op_bills)
-#   IP Radiology       → IPRInv* / radiology_charge > 0
-#   Direct Patients    → walk-in consultation without appointment (rare)
-#
-# The charge signature is what splits OP Diagnostics from Direct Diagnostics:
-# both use the OPInv prefix, but OP Diagnostics carries service_charge and
-# Direct Diagnostics carries only lab_charge.
-
 def _route_op_bill(bill_no, consult, lab, radiology, proc, service):
-    """
-    Return one of:
-      'op_billing' | 'op_diagnostics' | 'op_radiology'
-      'direct_patients' | 'direct_diagnostics' | 'direct_radiology'
-      'ip_diagnostics' | 'ip_radiology' | None
-    """
     bn = (bill_no or "").upper()
 
-    # --- IP module: prefix is authoritative ---
     if bn.startswith("IPD"):
         return "ip_diagnostics"
     if bn.startswith("IPR"):
         return "ip_radiology"
 
-    # --- Direct Diagnostics: lab-only, no other charges, non-IP bill ---
-    # Check this BEFORE the prefix branches because lab-only rows can
-    # appear under OPInv invoice numbers (14 such rows in April 2025).
     if (lab > 0
             and consult == 0
             and radiology == 0
@@ -260,17 +255,13 @@ def _route_op_bill(bill_no, consult, lab, radiology, proc, service):
             and service == 0):
         return "direct_diagnostics"
 
-    # --- OP Radiology module (OPRInv prefix) ---
     if bn.startswith("OPR"):
-        # radiology_charge = Direct Radiology
-        # service_charge   = OP Radiology
         if radiology > 0 and service == 0 and lab == 0:
             return "direct_radiology"
         if service > 0:
             return "op_radiology"
         return "op_radiology"
 
-    # --- OP Diagnostics module (OPInv prefix) ---
     if bn.startswith("OPINV") or bn.startswith("OPDINV") or bn.startswith("OPIN"):
         if service > 0:
             return "op_diagnostics"
@@ -280,11 +271,9 @@ def _route_op_bill(bill_no, consult, lab, radiology, proc, service):
             return "op_diagnostics"
         return "op_diagnostics"
 
-    # --- Consultation / Registration module (INV prefix) ---
     if bn.startswith("INV"):
         return "op_billing"
 
-    # --- Fallback by charge column ---
     if consult > 0 and lab == 0 and radiology == 0 and proc == 0 and service == 0:
         return "op_billing"
     if service > 0:
@@ -320,7 +309,6 @@ def collection_summary():
     ip_due_bill = 0.0
     ip_due_lab_radiology = 0.0
 
-    # ----- OP bills --------------------------------------------------------
     op_bills = query("""
         SELECT id, bill_no, patient_id, appointment_id,
                consultation_charge, lab_charge, procedure_charge,
@@ -344,8 +332,6 @@ def collection_summary():
         proc      = float(b["procedure_charge"] or 0)
         service   = float(b["service_charge"] or 0)
 
-        # Legacy fallback: bulk imports sometimes dump the amount into
-        # consultation_charge when nothing else is populated.
         if consult == 0 and lab == 0 and radiology == 0 and proc == 0 and service == 0:
             fallback = paid + due
             bn_u = (b.get("bill_no") or "").upper()
@@ -369,14 +355,9 @@ def collection_summary():
 
         elif bucket_name == "op_diagnostics":
             parts = {"lab": lab, "service": service, "proc": proc}
-            bucket_map = {
-                "lab": op_diagnostics,
-                "service": op_diagnostics,
-                "proc": op_diagnostics,
-            }
+            bucket_map = {"lab": op_diagnostics, "service": op_diagnostics, "proc": op_diagnostics}
 
         elif bucket_name == "op_radiology":
-            # OPRInv rows carry the amount in service_charge, not radiology_charge.
             parts = {"radiology": service or radiology}
             bucket_map = {"radiology": op_radiology}
 
@@ -386,11 +367,7 @@ def collection_summary():
 
         elif bucket_name == "direct_diagnostics":
             parts = {"lab": lab, "service": service, "proc": proc}
-            bucket_map = {
-                "lab": direct_diagnostics,
-                "service": direct_diagnostics,
-                "proc": direct_diagnostics,
-            }
+            bucket_map = {"lab": direct_diagnostics, "service": direct_diagnostics, "proc": direct_diagnostics}
 
         elif bucket_name == "direct_radiology":
             parts = {"radiology": radiology}
@@ -398,11 +375,7 @@ def collection_summary():
 
         elif bucket_name == "ip_diagnostics":
             parts = {"lab": lab, "service": service, "proc": proc}
-            bucket_map = {
-                "lab": ip_diagnostics,
-                "service": ip_diagnostics,
-                "proc": ip_diagnostics,
-            }
+            bucket_map = {"lab": ip_diagnostics, "service": ip_diagnostics, "proc": ip_diagnostics}
 
         elif bucket_name == "ip_radiology":
             parts = {"radiology": radiology}
@@ -413,7 +386,6 @@ def collection_summary():
 
         _distribute(paid, mode, split, parts, bucket_map)
 
-        # Due tracking
         total_parts = sum(parts.values()) or 0
         if due and total_parts > 0:
             if bucket_name in ("op_radiology", "direct_radiology", "ip_radiology"):
@@ -423,7 +395,6 @@ def collection_summary():
             else:
                 op_due_direct += due
 
-    # ----- IP bills --------------------------------------------------------
     ip_cols = {c["Field"] for c in query("SHOW COLUMNS FROM ip_bills", many=True)}
     has_ip_mode = "payment_mode" in ip_cols
     has_ip_split = "payment_split" in ip_cols
@@ -464,11 +435,7 @@ def collection_summary():
         )
 
         parts = {"other": other, "lab": lab, "radiology": radiology}
-        bucket_map = {
-            "other": ip_income,
-            "lab": ip_diagnostics,
-            "radiology": ip_radiology,
-        }
+        bucket_map = {"other": ip_income, "lab": ip_diagnostics, "radiology": ip_radiology}
         _distribute(paid, mode, split, parts, bucket_map)
 
         total_parts = sum(parts.values()) or 1
@@ -476,7 +443,13 @@ def collection_summary():
             ip_due_bill += due * (other / total_parts)
             ip_due_lab_radiology += due * ((lab + radiology) / total_parts)
 
-    # ----- Refunds ---------------------------------------------------------
+    for bucket in (
+        op_billing, op_diagnostics, op_radiology,
+        direct_patients, direct_diagnostics, direct_radiology,
+        ip_income, ip_diagnostics, ip_radiology,
+    ):
+        _apply_cash_adjustment(bucket)
+
     refunds = query("""
         SELECT bill_type, IFNULL(SUM(amount),0) s
         FROM billing_actions
@@ -486,7 +459,6 @@ def collection_summary():
     """, (start_date, end_date), many=True)
     refund_map = {r["bill_type"]: float(r["s"]) for r in refunds}
 
-    # ----- Totals ----------------------------------------------------------
     total_income = (
         op_billing["total"] + op_diagnostics["total"] + op_radiology["total"]
         + direct_patients["total"] + direct_diagnostics["total"] + direct_radiology["total"]
@@ -530,4 +502,261 @@ def collection_summary():
                 + ip_due_bill + ip_due_lab_radiology
             ),
         },
+    })
+
+
+# ---------------------------------------------------------------------------
+# COLLECTION BREAKDOWN (drill-down for Cash / Card / UPI / Bank / Total)
+# ---------------------------------------------------------------------------
+# Category → (buckets into which a row must fall, filter predicate)
+#
+# We reuse the exact same classification as collection_summary so the
+# drill-down rows always sum to the same totals the card shows.
+def _row_matches_category(bucket_name, category):
+    if category == "op_billing":
+        return bucket_name == "op_billing"
+    if category == "op_diagnostics":
+        return bucket_name == "op_diagnostics"
+    if category == "op_radiology":
+        return bucket_name == "op_radiology"
+    if category == "direct_patients":
+        return bucket_name == "direct_patients"
+    if category == "direct_diagnostics":
+        return bucket_name == "direct_diagnostics"
+    if category == "direct_radiology":
+        return bucket_name == "direct_radiology"
+    if category == "ip_income":
+        return bucket_name == "ip_diagnostics" or bucket_name == "ip_radiology"
+    if category == "ip_diagnostics":
+        return bucket_name == "ip_diagnostics"
+    if category == "ip_radiology":
+        return bucket_name == "ip_radiology"
+    return False
+
+
+def _row_amount_for_mode(bucket_name, mode, consult, lab, radiology, proc, service,
+                          paid, due, payment_mode, split_json):
+    """
+    Return (amount_for_mode, total_bill) for a row given a mode filter.
+
+    mode = 'total'  → full bill amount that falls into this bucket
+    mode = other    → only the portion of the bill paid via that mode
+    """
+    # Bill's bucket amount (same logic as collection_summary)
+    if bucket_name == "op_billing" or bucket_name == "direct_patients":
+        bill_amount = consult
+    elif bucket_name == "op_radiology":
+        bill_amount = service or radiology
+    elif bucket_name == "direct_radiology":
+        bill_amount = radiology
+    elif bucket_name == "ip_radiology":
+        bill_amount = radiology
+    elif bucket_name in ("op_diagnostics", "direct_diagnostics", "ip_diagnostics"):
+        bill_amount = lab + service + proc
+    else:
+        bill_amount = paid
+
+    if bill_amount <= 0:
+        return 0.0, 0.0
+
+    if mode == "total":
+        return bill_amount, bill_amount
+
+    # Only the amount actually paid via that mode
+    mode_sum = 0.0
+    splits = list(_iter_paid_splits(paid, payment_mode, split_json))
+    for m, amt in splits:
+        if _mode_key(m) == _mode_key(mode):
+            mode_sum += amt
+
+    # Only count it if the bill actually has money via that mode
+    if mode_sum <= 0:
+        return 0.0, bill_amount
+
+    # Scale the mode's paid portion down to the bill's bucket amount
+    paid_fraction = (bill_amount / paid) if paid > 0 else 0
+    return mode_sum * paid_fraction, bill_amount
+
+
+@dashboard_bp.route("/collection-breakdown", methods=["GET"])
+@jwt_required()
+def collection_breakdown():
+    start_date = request.args.get("start_date") or date.today().isoformat()
+    end_date = request.args.get("end_date") or date.today().isoformat()
+    category = (request.args.get("category") or "op_billing").lower()
+    mode = (request.args.get("mode") or "total").lower()
+
+    if mode not in ("cash", "card", "upi", "bank", "total"):
+        mode = "total"
+
+    rows_out = []
+
+    # ---- OP bills --------------------------------------------------------
+    op_bills = query("""
+        SELECT b.id, b.bill_no, b.patient_id, b.appointment_id,
+               b.consultation_charge, b.lab_charge, b.procedure_charge,
+               b.service_charge, b.pharmacy_charge, b.radiology_charge,
+               b.paid_amount, b.due_amount, b.payment_mode, b.payment_split,
+               b.status, b.created_at,
+               p.patient_uid, p.name, p.phone, r.opd_reg_no
+        FROM op_bills b
+        JOIN patients p ON p.id = b.patient_id
+        LEFT JOIN op_registrations r ON r.id = b.op_registration_id
+        WHERE DATE(b.created_at) BETWEEN %s AND %s
+          AND b.status <> 'Cancelled'
+    """, (start_date, end_date), many=True)
+
+    for b in op_bills:
+        paid = float(b["paid_amount"] or 0)
+        due = float(b["due_amount"] or 0)
+        consult   = float(b["consultation_charge"] or 0)
+        lab       = float(b["lab_charge"] or 0)
+        radiology = float(b.get("radiology_charge") or 0)
+        proc      = float(b["procedure_charge"] or 0)
+        service   = float(b["service_charge"] or 0)
+
+        if consult == 0 and lab == 0 and radiology == 0 and proc == 0 and service == 0:
+            fallback = paid + due
+            bn_u = (b.get("bill_no") or "").upper()
+            if bn_u.startswith("OPR"):
+                radiology = fallback
+            elif bn_u.startswith("OPINV"):
+                service = fallback
+            else:
+                consult = fallback
+
+        bucket_name = _route_op_bill(b["bill_no"], consult, lab, radiology, proc, service)
+        if not bucket_name or not _row_matches_category(bucket_name, category):
+            continue
+
+        # IP-related categories only show IPD*/IPR* rows in the drill-down
+        if category == "ip_income" and not (bucket_name in ("ip_diagnostics", "ip_radiology")):
+            continue
+
+        amount, total_bill = _row_amount_for_mode(
+            bucket_name, mode, consult, lab, radiology, proc, service,
+            paid, due, b["payment_mode"], b["payment_split"],
+        )
+
+        if mode != "total" and amount <= 0:
+            continue
+
+        if mode == "total" and total_bill <= 0:
+            continue
+
+        # Show all four modes for context
+        cash_part = card_part = upi_part = bank_part = 0.0
+        for m, amt in _iter_paid_splits(paid, b["payment_mode"], b["payment_split"]):
+            k = _mode_key(m)
+            if k == "cash":
+                cash_part += amt
+            elif k == "card":
+                card_part += amt
+            elif k == "upi":
+                upi_part += amt
+            else:
+                bank_part += amt
+
+        rows_out.append({
+            "patient_reg_no": b.get("opd_reg_no") or b.get("patient_uid"),
+            "name": b.get("name"),
+            "phone": b.get("phone"),
+            "cash": round(cash_part, 2),
+            "card": round(card_part, 2),
+            "upi": round(upi_part, 2),
+            "bank": round(bank_part, 2),
+            "total": round(total_bill, 2),
+            "_mode_amount": round(amount, 2),
+        })
+
+    # ---- IP bills --------------------------------------------------------
+    if category in ("ip_income", "ip_diagnostics", "ip_radiology"):
+        ip_cols = {c["Field"] for c in query("SHOW COLUMNS FROM ip_bills", many=True)}
+        mode_select = "payment_mode" if "payment_mode" in ip_cols else "'Cash' AS payment_mode"
+        split_select = "payment_split" if "payment_split" in ip_cols else "NULL AS payment_split"
+
+        ip_bills = query(f"""
+            SELECT b.id, b.ip_registration_id, b.admission_charge, b.room_charge,
+                   b.doctor_visit_charge, b.lab_charge, b.radiology_charge, b.ot_charge,
+                   b.procedure_charge, b.medicine_charge, b.nursing_charge,
+                   b.service_charge, b.food_charge, b.misc_charge,
+                   b.paid_amount, b.due_amount, b.created_at,
+                   {mode_select}, {split_select},
+                   p.patient_uid, p.name, p.phone, r.ip_reg_no
+            FROM ip_bills b
+            JOIN ip_registrations r ON r.id = b.ip_registration_id
+            JOIN patients p ON p.id = r.patient_id
+            WHERE DATE(b.created_at) BETWEEN %s AND %s
+              AND b.status <> 'Cancelled'
+        """, (start_date, end_date), many=True)
+
+        for b in ip_bills:
+            paid = float(b["paid_amount"] or 0)
+            due = float(b["due_amount"] or 0)
+            lab = float(b["lab_charge"] or 0)
+            radiology = float(b["radiology_charge"] or 0)
+            other = (
+                float(b["admission_charge"] or 0) + float(b["room_charge"] or 0)
+                + float(b["doctor_visit_charge"] or 0) + float(b["ot_charge"] or 0)
+                + float(b["procedure_charge"] or 0) + float(b["medicine_charge"] or 0)
+                + float(b["nursing_charge"] or 0) + float(b["service_charge"] or 0)
+                + float(b["food_charge"] or 0) + float(b["misc_charge"] or 0)
+            )
+
+            if category == "ip_income":
+                bill_amount = other
+                bucket_name = "ip_diagnostics"
+            elif category == "ip_diagnostics":
+                bill_amount = lab
+                bucket_name = "ip_diagnostics"
+            else:
+                bill_amount = radiology
+                bucket_name = "ip_radiology"
+
+            if bill_amount <= 0:
+                continue
+
+            cash_part = card_part = upi_part = bank_part = 0.0
+            for m, amt in _iter_paid_splits(paid, b["payment_mode"], b["payment_split"]):
+                k = _mode_key(m)
+                if k == "cash":
+                    cash_part += amt
+                elif k == "card":
+                    card_part += amt
+                elif k == "upi":
+                    upi_part += amt
+                else:
+                    bank_part += amt
+
+            if mode != "total":
+                mode_sum = {"cash": cash_part, "card": card_part,
+                            "upi": upi_part, "bank": bank_part}[mode]
+                if mode_sum <= 0:
+                    continue
+                amount = mode_sum * (bill_amount / paid) if paid > 0 else 0
+            else:
+                amount = bill_amount
+
+            rows_out.append({
+                "patient_reg_no": b.get("ip_reg_no") or b.get("patient_uid"),
+                "name": b.get("name"),
+                "phone": b.get("phone"),
+                "cash": round(cash_part, 2),
+                "card": round(card_part, 2),
+                "upi": round(upi_part, 2),
+                "bank": round(bank_part, 2),
+                "total": round(bill_amount, 2),
+                "_mode_amount": round(amount, 2),
+            })
+
+    # Sort: highest mode amount first
+    rows_out.sort(key=lambda r: -(r.get("_mode_amount") or 0))
+
+    return jsonify({
+        "category": category,
+        "mode": mode,
+        "range": {"start_date": start_date, "end_date": end_date},
+        "count": len(rows_out),
+        "total": round(sum(r["_mode_amount"] for r in rows_out), 2),
+        "rows": rows_out,
     })
