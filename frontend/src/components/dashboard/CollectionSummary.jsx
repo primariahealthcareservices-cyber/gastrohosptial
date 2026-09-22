@@ -54,22 +54,37 @@ function CollectionCard({ icon: Icon, theme = 'blue', title, bucket, refund, cat
         <p className="uppercase tracking-wide text-ink/50 text-[11px] mb-1">
           {title} — {b.count ?? 0}
         </p>
-        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
-          <span className="text-ink/50">CASH</span>
-          <span className={`text-right font-medium ${clickable}`} onClick={() => onCellClick(category, 'cash')}>{fmt(b.cash)}</span>
+       <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+  <span
+    className={`text-ink/50 ${clickable}`}
+    onClick={() => onCellClick(category, 'cash')}
+  >CASH</span>
+  <span className="text-right font-medium">{fmt(b.cash)}</span>
 
-          <span className="text-ink/50">CARD</span>
-          <span className={`text-right font-medium ${clickable}`} onClick={() => onCellClick(category, 'card')}>{fmt(b.card)}</span>
+  <span
+    className={`text-ink/50 ${clickable}`}
+    onClick={() => onCellClick(category, 'card')}
+  >CARD</span>
+  <span className="text-right font-medium">{fmt(b.card)}</span>
 
-          <span className="text-ink/50">UPI</span>
-          <span className={`text-right font-medium ${clickable}`} onClick={() => onCellClick(category, 'upi')}>{fmt(b.upi)}</span>
+  <span
+    className={`text-ink/50 ${clickable}`}
+    onClick={() => onCellClick(category, 'upi')}
+  >UPI</span>
+  <span className="text-right font-medium">{fmt(b.upi)}</span>
 
-          <span className="text-ink/50">BANK</span>
-          <span className={`text-right font-medium ${clickable}`} onClick={() => onCellClick(category, 'bank')}>{fmt(b.bank)}</span>
+  <span
+    className={`text-ink/50 ${clickable}`}
+    onClick={() => onCellClick(category, 'bank')}
+  >BANK</span>
+  <span className="text-right font-medium">{fmt(b.bank)}</span>
 
-          <span className="text-ink/60 font-semibold border-t border-ink/10 pt-0.5 mt-0.5">TOTAL</span>
-          <span className={`text-right font-semibold border-t border-ink/10 pt-0.5 mt-0.5 ${clickable}`} onClick={() => onCellClick(category, 'total')}>{fmt(b.total)}</span>
-        </div>
+  <span
+    className={`text-ink/60 font-semibold border-t border-ink/10 pt-0.5 mt-0.5 ${clickable}`}
+    onClick={() => onCellClick(category, 'total')}
+  >TOTAL</span>
+  <span className="text-right font-semibold border-t border-ink/10 pt-0.5 mt-0.5">{fmt(b.total)}</span>
+</div>
       </div>
       {refund ? (
         <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] font-medium px-2 py-0.5 rounded-sm">

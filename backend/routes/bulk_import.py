@@ -250,7 +250,7 @@ def _fetch_bills(bill_type: str, from_date: str, to_date: str):
         WHERE b.status <> 'Cancelled'
           AND DATE(b.created_at) BETWEEN %s AND %s
           {cfg['extra_where']}
-        ORDER BY b.created_at DESC, b.id DESC
+        ORDER BY b.created_at ASC, b.id ASC
     """
     conn = get_db()
     cur = conn.cursor(dictionary=True, buffered=True)
@@ -279,18 +279,32 @@ def _rows_to_csv(rows, columns):
     for r in rows:
         writer.writerow([_stringify(r.get(key)) for key, _ in columns])
     return io.BytesIO(output.getvalue().encode("utf-8"))
+def _cell_value(v):
+    """Preserve numeric types for Excel so SUM() works out of the box.
+    Dates become plain strings (Excel auto-detects them). None becomes ''."""
+    if v is None:
+        return ""
+    if isinstance(v, datetime):
+        return v.strftime("%Y-%m-%d %H:%M:%S")
+    # Leave ints, floats, and Decimals alone — Excel needs them as numbers
+    if isinstance(v, (int, float)):
+        return v
+    # Handle Decimal (MySQL DECIMAL columns come back as Decimal objects)
+    from decimal import Decimal as _Decimal
+    if isinstance(v, _Decimal):
+        return float(v)
+    return str(v)
 
 
 def _rows_to_excel(rows, columns, sheet_name="Bills"):
     headers = [label for _, label in columns]
-    data = [[_stringify(r.get(key)) for key, _ in columns] for r in rows]
+    data = [[_cell_value(r.get(key)) for key, _ in columns] for r in rows]
     df = pd.DataFrame(data, columns=headers)
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df.to_excel(writer, index=False, sheet_name=sheet_name)
     output.seek(0)
     return output
-
 
 def _rows_to_pdf(rows, columns, title, from_date, to_date):
     if not REPORTLAB_AVAILABLE:

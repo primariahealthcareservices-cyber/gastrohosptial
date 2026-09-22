@@ -23,6 +23,10 @@ OP_BILLS_PAYMENT_MODES = ["Cash", "Card", "UPI", "Insurance", "Credit", "Bank"]
 
 _DATE_LIKE_RE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|^\d{4}-\d{2}-\d{2}")
 
+# 30% cash discount — applied at write time for Direct Diagnostics.
+# Only affects bills whose Pay Mode is Cash.
+CASH_DISCOUNT_MULTIPLIER = 0.70
+
 
 def load_lab_test_rates(cur):
     """Preload lab_tests catalog into a normalized-name -> cost lookup."""
@@ -53,11 +57,15 @@ def upsert_lab_bill(cur, invoice_no, patient_id, op_registration_id, total_amoun
     cur.execute("SELECT id FROM op_bills WHERE bill_no = %s", (invoice_no,))
     row = cur.fetchone()
     if row:
-        return row["id"], False  # already imported, skip line items too
+        return row["id"], False
 
     total_discount = discount + due_discount
     payment_mode = normalize_payment_mode(pay_mode, OP_BILLS_PAYMENT_MODES)
     status = "Paid" if due_amount <= 0 else ("Due" if paid_amount <= 0 else "Partial")
+
+    # Apply 30% cash discount when payment mode is Cash.
+    if (payment_mode or "").strip().lower() == "cash":
+        paid_amount = round(float(paid_amount or 0) * CASH_DISCOUNT_MULTIPLIER, 2)
 
     cur.execute("""
         INSERT INTO op_bills

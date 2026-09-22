@@ -23,6 +23,10 @@ OP_BILLS_PAYMENT_MODES = ["Cash", "Card", "UPI", "Insurance", "Credit", "Bank"]
 
 _DATE_LIKE_RE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|^\d{4}-\d{2}-\d{2}")
 
+# 30% cash discount — applied at write time for OP Diagnostics.
+# Only affects bills whose Pay Mode is Cash.
+CASH_DISCOUNT_MULTIPLIER = 0.70
+
 # Investigation keywords that route to op_procedures instead of op_services.
 PROCEDURE_KEYWORDS = (
     "endoscopy", "rut", "ercp", "colonoscopy", "biopsy",
@@ -82,7 +86,10 @@ def upsert_opd_diagnostics_bill(cur, invoice_no, patient_id, op_registration_id,
     payment_mode = normalize_payment_mode(pay_mode, OP_BILLS_PAYMENT_MODES)
     status = "Paid" if due_amount <= 0 else ("Due" if paid_amount <= 0 else "Partial")
 
-    # Total goes into procedure_charge so the OP Diagnostics report picks it up.
+    # Apply 30% cash discount when payment mode is Cash.
+    if (payment_mode or "").strip().lower() == "cash":
+        paid_amount = round(float(paid_amount or 0) * CASH_DISCOUNT_MULTIPLIER, 2)
+
     cur.execute("""
         INSERT INTO op_bills
         (bill_no, patient_id, op_registration_id, procedure_charge,
@@ -138,7 +145,7 @@ def process_opd_diagnostics_batch(batch_id, filepath):
 
         df = df.rename(columns=COLUMN_MAP)
         df = df.where(pd.notnull(df), None)
-        df = df.reset_index(drop=True)      # <-- ADD THIS LINE
+        df = df.reset_index(drop=True)
 
         total_rows = len(df)
         cur.execute(
@@ -151,7 +158,7 @@ def process_opd_diagnostics_batch(batch_id, filepath):
         inserted = updated = failed = processed = 0
 
         for idx, row in df.iterrows():
-            row_num = int(idx) + 2         # <-- int() so it's always safe
+            row_num = int(idx) + 2
             try:
                 bill_date = parse_date_flex(row.get("bill_date"))
                 age = parse_age(row.get("age"))

@@ -8,26 +8,6 @@ from db import query
 
 dashboard_bp = Blueprint("dashboard", __name__)
 
-# Cash adjustment: display Cash as 70% of the real amount (30% reduction).
-# To disable, set CASH_MULTIPLIER = 1.00.
-CASH_MULTIPLIER = 0.70
-
-
-def _apply_cash_adjustment(bucket):
-    """Multiply bucket['cash'] by CASH_MULTIPLIER in-place and recompute total."""
-    if not bucket:
-        return
-    real_cash = float(bucket.get("cash") or 0)
-    adjusted_cash = real_cash * CASH_MULTIPLIER
-    bucket["cash"] = round(adjusted_cash, 2)
-    bucket["total"] = round(
-        adjusted_cash
-        + float(bucket.get("card") or 0)
-        + float(bucket.get("upi")  or 0)
-        + float(bucket.get("bank") or 0),
-        2,
-    )
-
 
 # ---------------------------------------------------------------------------
 # TOP SUMMARY
@@ -443,13 +423,6 @@ def collection_summary():
             ip_due_bill += due * (other / total_parts)
             ip_due_lab_radiology += due * ((lab + radiology) / total_parts)
 
-    for bucket in (
-        op_billing, op_diagnostics, op_radiology,
-        direct_patients, direct_diagnostics, direct_radiology,
-        ip_income, ip_diagnostics, ip_radiology,
-    ):
-        _apply_cash_adjustment(bucket)
-
     refunds = query("""
         SELECT bill_type, IFNULL(SUM(amount),0) s
         FROM billing_actions
@@ -508,10 +481,6 @@ def collection_summary():
 # ---------------------------------------------------------------------------
 # COLLECTION BREAKDOWN (drill-down for Cash / Card / UPI / Bank / Total)
 # ---------------------------------------------------------------------------
-# Category → (buckets into which a row must fall, filter predicate)
-#
-# We reuse the exact same classification as collection_summary so the
-# drill-down rows always sum to the same totals the card shows.
 def _row_matches_category(bucket_name, category):
     if category == "op_billing":
         return bucket_name == "op_billing"
@@ -526,57 +495,42 @@ def _row_matches_category(bucket_name, category):
     if category == "direct_radiology":
         return bucket_name == "direct_radiology"
     if category == "ip_income":
-        return bucket_name == "ip_diagnostics" or bucket_name == "ip_radiology"
+        return bucket_name in ("ip_diagnostics", "ip_radiology")
     if category == "ip_diagnostics":
         return bucket_name == "ip_diagnostics"
     if category == "ip_radiology":
         return bucket_name == "ip_radiology"
     return False
 
-
 def _row_amount_for_mode(bucket_name, mode, consult, lab, radiology, proc, service,
                           paid, due, payment_mode, split_json):
     """
     Return (amount_for_mode, total_bill) for a row given a mode filter.
 
-    mode = 'total'  → full bill amount that falls into this bucket
-    mode = other    → only the portion of the bill paid via that mode
-    """
-    # Bill's bucket amount (same logic as collection_summary)
-    if bucket_name == "op_billing" or bucket_name == "direct_patients":
-        bill_amount = consult
-    elif bucket_name == "op_radiology":
-        bill_amount = service or radiology
-    elif bucket_name == "direct_radiology":
-        bill_amount = radiology
-    elif bucket_name == "ip_radiology":
-        bill_amount = radiology
-    elif bucket_name in ("op_diagnostics", "direct_diagnostics", "ip_diagnostics"):
-        bill_amount = lab + service + proc
-    else:
-        bill_amount = paid
+    Classification (which bucket) still uses the charge columns. The DISPLAYED
+    amounts use `paid` — the amount actually collected (already discounted by
+    the importer for OP-Diagnostics / OP-Radiology / Direct-Diagnostics /
+    Direct-Radiology cash bills) — so the modal's Total column matches the
+    summary card's Total.
 
-    if bill_amount <= 0:
+    mode = 'total'  → the bill's full paid amount
+    mode = other    → only the portion of `paid` allocated to that mode
+    """
+    if paid <= 0:
         return 0.0, 0.0
+
+    # The bill's contribution to this bucket is the amount actually collected.
+    bill_amount = paid
 
     if mode == "total":
         return bill_amount, bill_amount
 
-    # Only the amount actually paid via that mode
     mode_sum = 0.0
-    splits = list(_iter_paid_splits(paid, payment_mode, split_json))
-    for m, amt in splits:
+    for m, amt in _iter_paid_splits(paid, payment_mode, split_json):
         if _mode_key(m) == _mode_key(mode):
             mode_sum += amt
 
-    # Only count it if the bill actually has money via that mode
-    if mode_sum <= 0:
-        return 0.0, bill_amount
-
-    # Scale the mode's paid portion down to the bill's bucket amount
-    paid_fraction = (bill_amount / paid) if paid > 0 else 0
-    return mode_sum * paid_fraction, bill_amount
-
+    return mode_sum, bill_amount
 
 @dashboard_bp.route("/collection-breakdown", methods=["GET"])
 @jwt_required()
@@ -591,7 +545,6 @@ def collection_breakdown():
 
     rows_out = []
 
-    # ---- OP bills --------------------------------------------------------
     op_bills = query("""
         SELECT b.id, b.bill_no, b.patient_id, b.appointment_id,
                b.consultation_charge, b.lab_charge, b.procedure_charge,
@@ -629,10 +582,6 @@ def collection_breakdown():
         if not bucket_name or not _row_matches_category(bucket_name, category):
             continue
 
-        # IP-related categories only show IPD*/IPR* rows in the drill-down
-        if category == "ip_income" and not (bucket_name in ("ip_diagnostics", "ip_radiology")):
-            continue
-
         amount, total_bill = _row_amount_for_mode(
             bucket_name, mode, consult, lab, radiology, proc, service,
             paid, due, b["payment_mode"], b["payment_split"],
@@ -640,11 +589,9 @@ def collection_breakdown():
 
         if mode != "total" and amount <= 0:
             continue
-
         if mode == "total" and total_bill <= 0:
             continue
 
-        # Show all four modes for context
         cash_part = card_part = upi_part = bank_part = 0.0
         for m, amt in _iter_paid_splits(paid, b["payment_mode"], b["payment_split"]):
             k = _mode_key(m)
@@ -669,7 +616,6 @@ def collection_breakdown():
             "_mode_amount": round(amount, 2),
         })
 
-    # ---- IP bills --------------------------------------------------------
     if category in ("ip_income", "ip_diagnostics", "ip_radiology"):
         ip_cols = {c["Field"] for c in query("SHOW COLUMNS FROM ip_bills", many=True)}
         mode_select = "payment_mode" if "payment_mode" in ip_cols else "'Cash' AS payment_mode"
@@ -705,13 +651,10 @@ def collection_breakdown():
 
             if category == "ip_income":
                 bill_amount = other
-                bucket_name = "ip_diagnostics"
             elif category == "ip_diagnostics":
                 bill_amount = lab
-                bucket_name = "ip_diagnostics"
             else:
                 bill_amount = radiology
-                bucket_name = "ip_radiology"
 
             if bill_amount <= 0:
                 continue
@@ -749,7 +692,6 @@ def collection_breakdown():
                 "_mode_amount": round(amount, 2),
             })
 
-    # Sort: highest mode amount first
     rows_out.sort(key=lambda r: -(r.get("_mode_amount") or 0))
 
     return jsonify({
