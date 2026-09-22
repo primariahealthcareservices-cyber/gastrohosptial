@@ -208,7 +208,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
   const totalOf = (key) => filtered.reduce((s, r) => s + Number(r[key] || 0), 0)
 
   const goTo = (p) => setPage(Math.min(Math.max(1, p), totalPages))
-
   const exportCsv = () => {
     const header = ['Patient Reg No.', 'Name', 'Phone', 'Cash(₹)', 'Card(₹)', 'UPI(₹)', 'Bank(₹)', 'Total(₹)']
     const lines = [header]
@@ -221,7 +220,8 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
       ])
     })
     const csv = lines.map((row) => row.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    // Prepend the UTF-8 BOM so Excel detects the encoding and renders ₹ correctly
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

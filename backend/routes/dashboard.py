@@ -1,3 +1,4 @@
+# backend/routes/dashboard.py
 from datetime import date, datetime
 import json
 
@@ -294,6 +295,7 @@ def collection_summary():
                consultation_charge, lab_charge, procedure_charge,
                service_charge, pharmacy_charge, radiology_charge,
                paid_amount, due_amount, payment_mode, payment_split,
+               gross_total, discount, net_total,
                status, remarks, created_at
         FROM op_bills
         WHERE DATE(created_at) BETWEEN %s AND %s
@@ -325,6 +327,26 @@ def collection_summary():
         bucket_name = _route_op_bill(
             b.get("bill_no"), consult, lab, radiology, proc, service,
         )
+
+        # ────────────────────────────────────────────────────────────────
+        # OP Billing card only: use net_total (already discounted in DB
+        # for Cash rows) rather than paid_amount. Other cards keep using
+        # paid_amount, matching their existing behaviour.
+        # ────────────────────────────────────────────────────────────────
+        if bucket_name == "op_billing":
+            net_total = float(b.get("net_total") or 0)
+            if net_total <= 0:
+                net_total = paid  # fallback if DB value is missing
+            gross_sum = consult + lab + radiology + proc + service
+            if gross_sum > 0 and net_total > 0 and abs(gross_sum - net_total) > 0.01:
+                scale = net_total / gross_sum
+                consult   *= scale
+                lab       *= scale
+                radiology *= scale
+                proc      *= scale
+                service   *= scale
+            paid = net_total
+            due = 0.0
 
         parts = {}
         bucket_map = {}
@@ -502,24 +524,12 @@ def _row_matches_category(bucket_name, category):
         return bucket_name == "ip_radiology"
     return False
 
+
 def _row_amount_for_mode(bucket_name, mode, consult, lab, radiology, proc, service,
                           paid, due, payment_mode, split_json):
-    """
-    Return (amount_for_mode, total_bill) for a row given a mode filter.
-
-    Classification (which bucket) still uses the charge columns. The DISPLAYED
-    amounts use `paid` — the amount actually collected (already discounted by
-    the importer for OP-Diagnostics / OP-Radiology / Direct-Diagnostics /
-    Direct-Radiology cash bills) — so the modal's Total column matches the
-    summary card's Total.
-
-    mode = 'total'  → the bill's full paid amount
-    mode = other    → only the portion of `paid` allocated to that mode
-    """
     if paid <= 0:
         return 0.0, 0.0
 
-    # The bill's contribution to this bucket is the amount actually collected.
     bill_amount = paid
 
     if mode == "total":
@@ -531,6 +541,7 @@ def _row_amount_for_mode(bucket_name, mode, consult, lab, radiology, proc, servi
             mode_sum += amt
 
     return mode_sum, bill_amount
+
 
 @dashboard_bp.route("/collection-breakdown", methods=["GET"])
 @jwt_required()
@@ -550,6 +561,7 @@ def collection_breakdown():
                b.consultation_charge, b.lab_charge, b.procedure_charge,
                b.service_charge, b.pharmacy_charge, b.radiology_charge,
                b.paid_amount, b.due_amount, b.payment_mode, b.payment_split,
+               b.gross_total, b.discount, b.net_total,
                b.status, b.created_at,
                p.patient_uid, p.name, p.phone, r.opd_reg_no
         FROM op_bills b
@@ -582,9 +594,15 @@ def collection_breakdown():
         if not bucket_name or not _row_matches_category(bucket_name, category):
             continue
 
+        # OP Billing: use net_total (post-discount) for the displayed values.
+        effective_paid = paid
+        if bucket_name == "op_billing" and category == "op_billing":
+            net_total = float(b.get("net_total") or 0)
+            effective_paid = net_total if net_total > 0 else paid
+
         amount, total_bill = _row_amount_for_mode(
             bucket_name, mode, consult, lab, radiology, proc, service,
-            paid, due, b["payment_mode"], b["payment_split"],
+            effective_paid, 0.0, b["payment_mode"], b["payment_split"],
         )
 
         if mode != "total" and amount <= 0:
@@ -593,7 +611,7 @@ def collection_breakdown():
             continue
 
         cash_part = card_part = upi_part = bank_part = 0.0
-        for m, amt in _iter_paid_splits(paid, b["payment_mode"], b["payment_split"]):
+        for m, amt in _iter_paid_splits(effective_paid, b["payment_mode"], b["payment_split"]):
             k = _mode_key(m)
             if k == "cash":
                 cash_part += amt

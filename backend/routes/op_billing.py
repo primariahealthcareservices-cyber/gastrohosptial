@@ -34,17 +34,28 @@ def create_bill():
     if not d.get("patient_id"):
         return jsonify({"error": "patient_id is required"}), 400
 
+    # ── Compute gross total across every charge column ─────────────
+    # NOTE: `radiology_charge` was missing before and got silently
+    # dropped from `gross_total`. Now included.
     charges = [
         "consultation_charge", "lab_charge", "procedure_charge",
-        "service_charge", "pharmacy_charge",
+        "service_charge", "pharmacy_charge", "radiology_charge",
     ]
     gross = sum(float(d.get(charge, 0) or 0) for charge in charges)
+
+    # ── Discount: honour the client value, otherwise auto-apply 30%
+    #    for Cash bills so new rows match the DB backfill.
     discount = float(d.get("discount", 0) or 0)
+    if discount == 0 and (d.get("payment_mode") or "Cash") == "Cash":
+        discount = round(gross * 0.30, 2)
+
     taxable = max(0, gross - discount)
     net_total = round(taxable, 2)
+
     paid = float(d.get("paid_amount", 0) or 0)
     due = round(max(0, net_total - paid), 2)
     status = "Paid" if due <= 0 else ("Partial" if paid > 0 else "Due")
+
     bill_no = next_code("OPB", "op_bills", "bill_no")
     user_id = get_jwt_identity()
 
@@ -52,17 +63,18 @@ def create_bill():
         """
         INSERT INTO op_bills (
             bill_no, patient_id, appointment_id,
-            consultation_charge, lab_charge, procedure_charge, service_charge, pharmacy_charge,
+            consultation_charge, lab_charge, procedure_charge,
+            service_charge, pharmacy_charge, radiology_charge,
             gross_total, discount, net_total,
             paid_amount, due_amount, payment_mode, status, created_by
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
             bill_no, d["patient_id"], d.get("appointment_id"),
             d.get("consultation_charge", 0), d.get("lab_charge", 0),
             d.get("procedure_charge", 0), d.get("service_charge", 0),
-            d.get("pharmacy_charge", 0),
+            d.get("pharmacy_charge", 0), d.get("radiology_charge", 0),
             gross, discount, net_total,
             paid, due, d.get("payment_mode", "Cash"), status, user_id,
         ),
