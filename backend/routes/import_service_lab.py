@@ -7,6 +7,7 @@ from routes.common_import import (
     normalize_gender, normalize_referral, normalize_payment_mode,
     get_or_create_doctor, get_or_create_patient, get_or_create_op_registration,
     get_user_id_by_name, safe_json_dump,
+    record_refund_from_row,
 )
 
 COLUMN_MAP = {
@@ -17,6 +18,8 @@ COLUMN_MAP = {
     "Due Discount": "due_discount", "BillAmount": "bill_amount", "PaidAmount": "paid_amount",
     "Due Amount": "due_amount", "Pay Mode": "pay_mode", "User Name": "user_name",
     "Referral Type": "referral_type", "Referral Doctor": "referral_doctor",
+    "Refund Request Reason":  "refund_request_reason",
+    "Refund Approved Reason": "refund_approved_reason",
 }
 
 OP_BILLS_PAYMENT_MODES = ["Cash", "Card", "UPI", "Insurance", "Credit", "Bank"]
@@ -179,6 +182,25 @@ def process_lab_batch(batch_id, filepath):
                 conn.commit()
                 inserted += 1 if was_inserted else 0
                 updated += 0 if was_inserted else 1
+
+                # ── Refund: runs on every row (idempotent only if you add the
+                #    UNIQUE(bill_type, bill_id, action_type) key — see notes) ──
+                try:
+                    record_refund_from_row(
+                        cur,
+                        bill_type="OP",
+                        bill_no=row.get("invoice_no"),
+                        category="op_diagnostics",     # lab → OP Diagnostics card
+                        amount=to_decimal(row.get("total_amount")),
+                        pay_mode=row.get("pay_mode"),
+                        request_reason=row.get("refund_request_reason"),
+                        approved_reason=row.get("refund_approved_reason"),
+                        performed_by=created_by,
+                        bill_date=bill_date,
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
 
             except Exception as e:
                 conn.rollback()

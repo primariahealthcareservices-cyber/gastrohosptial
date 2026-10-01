@@ -25,6 +25,10 @@ COLUMN_MAP = {
     "Due Total":               "due_total",
     "Credit Due":              "credit_due",
     "Insurance Due":           "insurance_due",
+    # Optional refund columns — only used if the migration below has run.
+    "Refund Amount":           "refund_amount",
+    "Refund Request Reason":   "refund_request_reason",
+    "Refund Approved Reason":  "refund_approved_reason",
 }
 
 _DATE_LIKE_RE = re.compile(r"^\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|^\d{4}-\d{2}-\d{2}")
@@ -84,6 +88,72 @@ def upsert_summary_row(cur, row):
     cur.execute(sql, tuple(values))
 
 
+# ---------------------------------------------------------------------------
+# OPTIONAL REFUND HOOK (disabled until billing_actions.bill_id is nullable)
+# ---------------------------------------------------------------------------
+def _billing_actions_bill_id_is_nullable(cur):
+    """True once the FK on billing_actions.bill_id has been dropped and the
+    column allows NULL. Returns False otherwise so daily-summary refunds are
+    skipped safely on the current schema."""
+    try:
+        cur.execute("""
+            SELECT IS_NULLABLE
+            FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME   = 'billing_actions'
+              AND COLUMN_NAME  = 'bill_id'
+        """)
+        row = cur.fetchone()
+        if not row:
+            return False
+        return (row.get("IS_NULLABLE") or "").upper() == "YES"
+    except Exception:
+        return False
+
+
+def maybe_record_summary_refund(cur, row, summary_date):
+    """
+    If the daily-summary CSV carries a Refund Amount plus reasons AND the
+    billing_actions.bill_id column has been made nullable, record a single
+    aggregate refund row for that day. Otherwise no-op.
+
+    Category is set to 'op_billing' — change if you want a different card.
+    """
+    ref_amt  = to_decimal(row.get("refund_amount"))
+    ref_req  = (str(row.get("refund_request_reason")).strip()
+                if row.get("refund_request_reason") else None)
+    ref_appr = (str(row.get("refund_approved_reason")).strip()
+                if row.get("refund_approved_reason") else None)
+
+    if ref_amt <= 0 or (not ref_req and not ref_appr):
+        return None
+
+    if not _billing_actions_bill_id_is_nullable(cur):
+        # Schema not ready — skip silently. Enable by running:
+        #   ALTER TABLE billing_actions DROP FOREIGN KEY billing_actions_ibfk_1;
+        #   ALTER TABLE billing_actions MODIFY COLUMN bill_id INT NULL;
+        return None
+
+    try:
+        cur.execute("""
+            INSERT INTO billing_actions
+                (bill_type, bill_id, category, action_type, amount, payment_mode,
+                 reason, request_reason, approved_reason,
+                 performed_by, approved_by, created_at)
+            VALUES ('OP', NULL, 'op_billing', 'Advance_Refund', %s, 'Cash',
+                    %s, %s, %s, NULL, NULL, %s)
+        """, (
+            ref_amt,
+            ref_appr or ref_req,
+            ref_req,
+            ref_appr,
+            summary_date,
+        ))
+        return cur.lastrowid
+    except Exception:
+        return None
+
+
 def process_daily_summary_batch(batch_id, filepath):
     conn = get_db()
     cur = conn.cursor(dictionary=True, buffered=True)
@@ -117,6 +187,15 @@ def process_daily_summary_batch(batch_id, filepath):
                 upsert_summary_row(cur, row)
                 conn.commit()
                 inserted += 1
+
+                # Optional: aggregate refund for this day (no-op on current schema)
+                try:
+                    summary_date = _to_date(row.get("summary_date"))
+                    maybe_record_summary_refund(cur, row, summary_date)
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
+
             except Exception as e:
                 conn.rollback()
                 failed += 1

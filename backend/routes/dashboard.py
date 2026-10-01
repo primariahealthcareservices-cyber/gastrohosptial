@@ -129,19 +129,37 @@ def department_collection():
 def _empty_bucket():
     return {"cash": 0.0, "card": 0.0, "upi": 0.0, "bank": 0.0, "total": 0.0, "count": 0}
 
-
 def _mode_key(mode):
+    """Normalize any pay-mode string to one of: cash / card / upi / bank."""
     if not mode:
         return "cash"
     m = str(mode).strip().lower()
+
     if m == "cash":
         return "cash"
     if m == "card":
         return "card"
     if m == "upi":
         return "upi"
-    return "bank"
 
+    if (
+        "upi" in m
+        or "phonepe" in m or "phone pe" in m
+        or "gpay" in m or "g pay" in m or "google pay" in m
+        or "paytm" in m or "bhim" in m or "amazon pay" in m
+    ):
+        return "upi"
+    if (
+        "card" in m or "credit" in m or "debit" in m
+        or "visa" in m or "master" in m or "rupay" in m
+    ):
+        return "card"
+    if (
+        "bank" in m or "neft" in m or "rtgs" in m or "imps" in m
+        or "cheque" in m or "transfer" in m
+    ):
+        return "bank"
+    return "cash"
 
 def _add(bucket, mode, amount):
     try:
@@ -222,7 +240,7 @@ def _distribute(paid_amount, single_mode, split_json, parts, bucket_map):
 # CLASSIFICATION
 # ---------------------------------------------------------------------------
 def _route_op_bill(bill_no, consult, lab, radiology, proc, service):
-    bn = (bill_no or "").upper()
+    bn = str(bill_no or "").upper()
 
     if bn.startswith("IPD"):
         return "ip_diagnostics"
@@ -264,6 +282,39 @@ def _route_op_bill(bill_no, consult, lab, radiology, proc, service):
     if lab > 0:
         return "op_diagnostics"
     return None
+
+
+# ---------------------------------------------------------------------------
+# REFUND HELPER
+# ---------------------------------------------------------------------------
+def _classify_refund(ba_row):
+    """
+    Decide which CollectionSummary category a refund row belongs to.
+    Prefers a real 'category' column, then the joined op_bills.bill_no,
+    then falls back to bill_type. Never assumes bill_id is a string.
+    """
+    cat = (ba_row.get("category") or "").strip().lower()
+    if cat in (
+        "op_billing", "op_diagnostics", "op_radiology",
+        "direct_patients", "direct_diagnostics", "direct_radiology",
+        "ip_income", "ip_diagnostics", "ip_radiology",
+    ):
+        return cat
+
+    raw_bill_no = ba_row.get("bill_no")
+    bill_no = str(raw_bill_no).upper() if raw_bill_no else ""
+    if bill_no:
+        bucket = _route_op_bill(bill_no, 0, 0, 0, 0, 0)
+        if bucket in (
+            "op_billing", "op_diagnostics", "op_radiology",
+            "direct_patients", "direct_diagnostics", "direct_radiology",
+        ):
+            return bucket
+
+    bt = str(ba_row.get("bill_type") or "").upper()
+    if bt == "IP":
+        return "ip_income"
+    return "op_billing"
 
 
 # ---------------------------------------------------------------------------
@@ -328,15 +379,10 @@ def collection_summary():
             b.get("bill_no"), consult, lab, radiology, proc, service,
         )
 
-        # ────────────────────────────────────────────────────────────────
-        # OP Billing card only: use net_total (already discounted in DB
-        # for Cash rows) rather than paid_amount. Other cards keep using
-        # paid_amount, matching their existing behaviour.
-        # ────────────────────────────────────────────────────────────────
         if bucket_name == "op_billing":
             net_total = float(b.get("net_total") or 0)
             if net_total <= 0:
-                net_total = paid  # fallback if DB value is missing
+                net_total = paid
             gross_sum = consult + lab + radiology + proc + service
             if gross_sum > 0 and net_total > 0 and abs(gross_sum - net_total) > 0.01:
                 scale = net_total / gross_sum
@@ -445,14 +491,74 @@ def collection_summary():
             ip_due_bill += due * (other / total_parts)
             ip_due_lab_radiology += due * ((lab + radiology) / total_parts)
 
-    refunds = query("""
-        SELECT bill_type, IFNULL(SUM(amount),0) s
-        FROM billing_actions
-        WHERE action_type='Advance_Refund'
-          AND DATE(created_at) BETWEEN %s AND %s
-        GROUP BY bill_type
-    """, (start_date, end_date), many=True)
-    refund_map = {r["bill_type"]: float(r["s"]) for r in refunds}
+    # ─────────────────────────────────────────────────────────────────────
+    # REFUNDS — per category AND per payment mode
+    # ─────────────────────────────────────────────────────────────────────
+    CATEGORY_KEYS = [
+        "op_billing", "op_diagnostics", "op_radiology",
+        "direct_patients", "direct_diagnostics", "direct_radiology",
+        "ip_income", "ip_diagnostics", "ip_radiology",
+    ]
+    refund_map = {
+        k: {"cash": 0.0, "card": 0.0, "upi": 0.0, "bank": 0.0,
+            "total": 0.0, "count": 0}
+        for k in CATEGORY_KEYS
+    }
+
+    ba_cols = {c["Field"] for c in query("SHOW COLUMNS FROM billing_actions", many=True)}
+    has_category = "category" in ba_cols
+    has_mode = "payment_mode" in ba_cols
+
+    if has_category and has_mode:
+        refund_rows = query("""
+            SELECT bill_type, bill_id, category, payment_mode,
+                   IFNULL(amount,0) AS amount
+            FROM billing_actions
+            WHERE action_type='Advance_Refund'
+              AND DATE(created_at) BETWEEN %s AND %s
+        """, (start_date, end_date), many=True)
+    elif has_category:
+        refund_rows = query("""
+            SELECT bill_type, bill_id, category,
+                   'Cash' AS payment_mode,
+                   IFNULL(amount,0) AS amount
+            FROM billing_actions
+            WHERE action_type='Advance_Refund'
+              AND DATE(created_at) BETWEEN %s AND %s
+        """, (start_date, end_date), many=True)
+    else:
+        refund_rows = query("""
+            SELECT ba.bill_type, ba.bill_id,
+                   'Cash' AS payment_mode,
+                   ba.amount, ob.bill_no
+            FROM billing_actions ba
+            LEFT JOIN op_bills ob
+                   ON ob.id = ba.bill_id AND ba.bill_type='OP'
+            WHERE ba.action_type='Advance_Refund'
+              AND DATE(ba.created_at) BETWEEN %s AND %s
+        """, (start_date, end_date), many=True)
+
+    for r in refund_rows:
+        amt = float(r.get("amount") or 0)
+        if amt == 0:
+            continue
+        key = _classify_refund(r)
+        mode = _mode_key(r.get("payment_mode"))
+        bucket = refund_map[key]
+        bucket[mode] += amt
+        bucket["total"] += amt
+        bucket["count"] += 1
+
+    op_refund_total = (
+        refund_map["op_billing"]["total"]
+        + refund_map["op_diagnostics"]["total"]
+        + refund_map["op_radiology"]["total"]
+    )
+    ip_refund_total = (
+        refund_map["ip_income"]["total"]
+        + refund_map["ip_diagnostics"]["total"]
+        + refund_map["ip_radiology"]["total"]
+    )
 
     total_income = (
         op_billing["total"] + op_diagnostics["total"] + op_radiology["total"]
@@ -476,14 +582,18 @@ def collection_summary():
         "op_billing": op_billing,
         "op_diagnostics": op_diagnostics,
         "op_radiology": op_radiology,
-        "op_refund": refund_map.get("OP", 0.0),
         "direct_patients": direct_patients,
         "direct_diagnostics": direct_diagnostics,
         "direct_radiology": direct_radiology,
         "ip_income": ip_income,
         "ip_diagnostics": ip_diagnostics,
         "ip_radiology": ip_radiology,
-        "ip_refund": refund_map.get("IP", 0.0),
+
+        "refunds": refund_map,
+
+        "op_refund": op_refund_total,
+        "ip_refund": ip_refund_total,
+
         "total_income": total_income,
         "expenses": expenses,
         "grand_total": grand_total,
@@ -501,7 +611,7 @@ def collection_summary():
 
 
 # ---------------------------------------------------------------------------
-# COLLECTION BREAKDOWN (drill-down for Cash / Card / UPI / Bank / Total)
+# COLLECTION BREAKDOWN
 # ---------------------------------------------------------------------------
 def _row_matches_category(bucket_name, category):
     if category == "op_billing":
@@ -594,7 +704,6 @@ def collection_breakdown():
         if not bucket_name or not _row_matches_category(bucket_name, category):
             continue
 
-        # OP Billing: use net_total (post-discount) for the displayed values.
         effective_paid = paid
         if bucket_name == "op_billing" and category == "op_billing":
             net_total = float(b.get("net_total") or 0)

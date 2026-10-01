@@ -13,6 +13,7 @@ from routes.import_service_lab import start_lab_import_job
 from routes.import_service_radiology import start_radiology_import_job
 from routes.import_service_opd_diagnostics import start_opd_diagnostics_import_job
 from routes.import_service_daily_summary import start_daily_summary_import_job
+from routes.import_service_refunds import start_refunds_import_job
 
 # Optional PDF support — install with: pip install reportlab
 try:
@@ -40,6 +41,7 @@ IMPORT_HANDLERS = {
     "radiology_bills": start_radiology_import_job,
     "opd_diagnostics": start_opd_diagnostics_import_job,
     "daily_summary":   start_daily_summary_import_job,
+    "refunds":         start_refunds_import_job,   # ← new
 }
 
 
@@ -279,6 +281,8 @@ def _rows_to_csv(rows, columns):
     for r in rows:
         writer.writerow([_stringify(r.get(key)) for key, _ in columns])
     return io.BytesIO(output.getvalue().encode("utf-8"))
+
+
 def _cell_value(v):
     """Preserve numeric types for Excel so SUM() works out of the box.
     Dates become plain strings (Excel auto-detects them). None becomes ''."""
@@ -305,6 +309,7 @@ def _rows_to_excel(rows, columns, sheet_name="Bills"):
         df.to_excel(writer, index=False, sheet_name=sheet_name)
     output.seek(0)
     return output
+
 
 def _rows_to_pdf(rows, columns, title, from_date, to_date):
     if not REPORTLAB_AVAILABLE:

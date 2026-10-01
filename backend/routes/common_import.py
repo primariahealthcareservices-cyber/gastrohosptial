@@ -190,3 +190,148 @@ def safe_json_dump(row_dict):
         return json.dumps(cleaned, default=str, allow_nan=False)
     except Exception:
         return json.dumps({"error": "could not serialize row"})
+# ---------------------------------------------------------------------------
+# REFUND HELPERS (bulk-import)
+# ---------------------------------------------------------------------------
+# These helpers let any import service record an Advance_Refund row when the
+# CSV row carries refund reasons (either "Refund Request Reason",
+# "Refund Approved Reason", or both).
+
+VALID_REFUND_CATEGORIES = {
+    "op_billing", "op_diagnostics", "op_radiology",
+    "direct_patients", "direct_diagnostics", "direct_radiology",
+    "ip_income", "ip_diagnostics", "ip_radiology",
+}
+
+VALID_REFUND_MODES = {"Cash", "Card", "UPI", "Bank"}
+
+def normalize_refund_mode(pay_mode):
+    """
+    Normalize any free-text pay mode to one of: Cash / Card / UPI / Bank.
+
+    Tolerant of real-world variants:
+      UPI, upi, UPI - PhonePe, UPI/GPay, PhonePe, GPay, Google Pay,
+      Paytm, BHIM, Card, Credit Card, Debit Card, Visa, RuPay, Bank,
+      NEFT, RTGS, IMPS, Cheque, Cash, etc.
+    """
+    m = (clean_str(pay_mode) or "").lower()
+
+    if not m:
+        return "Cash"
+
+    # --- exact matches first ---
+    if m == "cash":
+        return "Cash"
+    if m == "card":
+        return "Card"
+    if m == "upi":
+        return "UPI"
+    if m == "bank":
+        return "Bank"
+
+    # --- UPI variants ---
+    if (
+        "upi" in m
+        or "phonepe" in m or "phone pe" in m or "phone-pe" in m
+        or "gpay" in m or "g pay" in m or "google pay" in m or "googlepay" in m
+        or "paytm" in m
+        or "bhim" in m
+        or "amazon pay" in m or "amazonpay" in m
+        or "whatsapp pay" in m
+        or "mobikwik" in m or "freecharge" in m
+    ):
+        return "UPI"
+
+    # --- Card variants ---
+    if (
+        "card" in m
+        or "credit" in m or "debit" in m
+        or "visa" in m or "master" in m or "mastercard" in m
+        or "rupay" in m or "maestro" in m or "amex" in m
+    ):
+        return "Card"
+
+    # --- Bank transfer variants ---
+    if (
+        "bank" in m
+        or "neft" in m or "rtgs" in m or "imps" in m
+        or "cheque" in m or "check" in m
+        or "transfer" in m
+    ):
+        return "Bank"
+
+    # --- Cash fallback ---
+    return "Cash"
+
+def _resolve_bill_id(cur, bill_type, bill_no):
+    """bill_no -> op_bills.id / ip_bills.id. Returns None if not found."""
+    if not clean_str(bill_no):
+        return None
+    table = "op_bills" if bill_type == "OP" else "ip_bills"
+    cur.execute(f"SELECT id FROM {table} WHERE bill_no=%s", (bill_no,))
+    row = cur.fetchone()
+    return row["id"] if row else None
+
+
+def record_refund_from_row(cur, *,
+                            bill_type,
+                            bill_no,
+                            category,
+                            amount,
+                            pay_mode,
+                            request_reason,
+                            approved_reason,
+                            performed_by,
+                            bill_date):
+    """
+    Insert an Advance_Refund row into billing_actions if the row carries
+    refund reasons. Returns the new action id, or None if there's nothing
+    to record.
+
+      bill_type        : 'OP' or 'IP'
+      bill_no          : invoice number (used to resolve bill_id)
+      category         : one of VALID_REFUND_CATEGORIES
+      amount           : numeric (>= 0)
+      pay_mode         : Cash / Card / UPI / Bank
+      request_reason   : text or None
+      approved_reason  : text or None
+      performed_by     : user id (int) or None
+      bill_date        : datetime for created_at
+    """
+    req  = clean_str(request_reason)
+    appr = clean_str(approved_reason)
+
+    if not req and not appr:
+        return None
+
+    bill_id = _resolve_bill_id(cur, bill_type, bill_no)
+    if bill_id is None:
+        # The bill hasn't been written yet or the invoice number doesn't
+        # match anything. Skip silently — never break the row import.
+        return None
+
+    if category not in VALID_REFUND_CATEGORIES:
+        category = "ip_income" if bill_type == "IP" else "op_billing"
+
+    amt = to_decimal(amount)
+    if amt < 0:
+        amt = 0
+
+    mode = normalize_refund_mode(pay_mode)
+    combined_reason = appr or req
+    when = bill_date or datetime.utcnow()
+
+    cur.execute("""
+        INSERT INTO billing_actions
+            (bill_type, bill_id, category, action_type, amount, payment_mode,
+             reason, request_reason, approved_reason,
+             performed_by, approved_by, created_at)
+        VALUES (%s, %s, %s, 'Advance_Refund', %s, %s,
+                %s, %s, %s,
+                %s, %s, %s)
+    """, (
+        bill_type, bill_id, category, amt, mode,
+        combined_reason, req, appr,
+        performed_by, performed_by, when,
+    ))
+    return cur.lastrowid

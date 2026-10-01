@@ -8,6 +8,7 @@ const TABS = [
   { key: "lab",             label: "Import Lab Bills" },
   { key: "radiology",       label: "Import Radiology Bills" },
   { key: "daily_summary",   label: "Import Daily Summary" },
+  { key: "refunds",         label: "Import Refunds" },       // ← new
   { key: "export",          label: "Export Bills" },
 ];
 
@@ -52,6 +53,12 @@ export default function BulkImport() {
         <ImportBills
           importType="daily_summary"
           label="Import Daily Collection Summary CSV/Excel (Date + all counts + totals)"
+        />
+      )}
+      {tab === "refunds" && (                                           /* ← new */
+        <ImportBills
+          importType="refunds"
+          label="Import Refunds CSV/Excel (Invoice Number + Amount + Reasons)"
         />
       )}
       {tab === "export" && <ExportOPDBills />}

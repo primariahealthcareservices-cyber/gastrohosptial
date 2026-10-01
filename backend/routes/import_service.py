@@ -4,9 +4,11 @@ import threading
 import pandas as pd
 from db import get_db
 from routes.common_import import (
-    clean_str, to_decimal, parse_date_flex, parse_age_gender_combined,
-    split_name, normalize_referral, get_or_create_doctor, get_or_create_patient,
-    get_or_create_op_registration, safe_json_dump,
+    clean_str, to_decimal, parse_date_flex, parse_age, split_name,
+    normalize_gender, normalize_referral, normalize_payment_mode,
+    get_or_create_doctor, get_or_create_patient, get_or_create_op_registration,
+    get_user_id_by_name, safe_json_dump,
+    record_refund_from_row,
 )
 
 COLUMN_MAP = {
@@ -17,6 +19,8 @@ COLUMN_MAP = {
     "Cash": "cash", "Card": "card", "UPI": "upi", "Bank": "bank", "Total": "total",
     "Referral": "referral", "MLC Patient": "mlc_patient", "MLC Number": "mlc_number",
     "Remarks": "remarks",
+    "Refund Request Reason": "refund_request_reason",
+    "Refund Approved Reason": "refund_approved_reason",
 }
 
 # Invoice prefixes this importer accepts, and how each is classified.
@@ -193,6 +197,48 @@ def process_batch(batch_id, filepath):
                 conn.commit()
                 inserted += 1 if was_inserted else 0
                 updated += 0 if was_inserted else 1
+
+                # ── 4) Record refund if the row carries refund reasons ──
+                #    Runs whether the bill was just inserted or already existed,
+                #    so re-imports stay idempotent for refunds too.
+                try:
+                    amounts = {
+                        "Cash": to_decimal(row.get("cash")),
+                        "Card": to_decimal(row.get("card")),
+                        "UPI":  to_decimal(row.get("upi")),
+                        "Bank": to_decimal(row.get("bank")),
+                    }
+                    dominant_mode = (
+                        max(amounts, key=amounts.get)
+                        if any(amounts.values()) else "Cash"
+                    )
+
+                    # Which card should this refund land on?
+                    # INV* / consultation → op_billing
+                    # OPInv / OPRInv / OPDInv → op_diagnostics / op_radiology
+                    bn_upper = bill_no.upper()
+                    if bn_upper.startswith("OPR"):
+                        refund_category = "op_radiology"
+                    elif bn_upper.startswith(("OPINV", "OPDINV", "OPIN")):
+                        refund_category = "op_diagnostics"
+                    else:
+                        refund_category = "op_billing"
+
+                    record_refund_from_row(
+                        cur,
+                        bill_type="OP",
+                        bill_no=bill_no,
+                        category=refund_category,
+                        amount=to_decimal(row.get("total")),
+                        pay_mode=dominant_mode,
+                        request_reason=row.get("refund_request_reason"),
+                        approved_reason=row.get("refund_approved_reason"),
+                        performed_by=get_user_id_by_name(cur, row.get("user_name")),
+                        bill_date=created_at,
+                    )
+                    conn.commit()
+                except Exception:
+                    conn.rollback()
 
             except Exception as e:
                 conn.rollback()

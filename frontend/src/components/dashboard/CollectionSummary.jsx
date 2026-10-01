@@ -10,6 +10,7 @@ import { Section } from '../PageHeader'
 const today = () => new Date().toISOString().slice(0, 10)
 
 const EMPTY_BUCKET = { cash: 0, card: 0, upi: 0, bank: 0, total: 0, count: 0 }
+const EMPTY_REFUND = { cash: 0, card: 0, upi: 0, bank: 0, total: 0, count: 0 }
 
 const fmt = (n) =>
   `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -40,57 +41,75 @@ function StatCard({ icon: Icon, theme = 'blue', title, value, sub }) {
   )
 }
 
-function CollectionCard({ icon: Icon, theme = 'blue', title, bucket, refund, category, onCellClick }) {
+function CollectionCard({
+  icon: Icon, theme = 'blue', title, bucket, refund, category,
+  onCellClick, showRefund = false,
+}) {
   const t = THEME[theme]
   const b = bucket || EMPTY_BUCKET
+  const r = refund || EMPTY_REFUND
   const clickable = 'cursor-pointer hover:underline hover:text-teal-700'
 
   return (
-    <div className={`flex items-stretch rounded-sm border ${t.border} ${t.bg} overflow-hidden relative`}>
+    <div className={`flex items-stretch rounded-sm border ${t.border} ${t.bg} overflow-hidden`}>
       <div className={`flex items-center justify-center w-14 shrink-0 ${t.chip}`}>
         <Icon size={22} className="text-white" />
       </div>
+
       <div className="p-3 flex-1 text-xs">
         <p className="uppercase tracking-wide text-ink/50 text-[11px] mb-1">
           {title} — {b.count ?? 0}
         </p>
-       <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
-  <span
-    className={`text-ink/50 ${clickable}`}
-    onClick={() => onCellClick(category, 'cash')}
-  >CASH</span>
-  <span className="text-right font-medium">{fmt(b.cash)}</span>
+        <div className="grid grid-cols-[auto_1fr] gap-x-2 gap-y-0.5">
+          <span className={`text-ink/50 ${clickable}`} onClick={() => onCellClick(category, 'cash')}>CASH</span>
+          <span className="text-right font-medium">{fmt(b.cash)}</span>
 
-  <span
-    className={`text-ink/50 ${clickable}`}
-    onClick={() => onCellClick(category, 'card')}
-  >CARD</span>
-  <span className="text-right font-medium">{fmt(b.card)}</span>
+          <span className={`text-ink/50 ${clickable}`} onClick={() => onCellClick(category, 'card')}>CARD</span>
+          <span className="text-right font-medium">{fmt(b.card)}</span>
 
-  <span
-    className={`text-ink/50 ${clickable}`}
-    onClick={() => onCellClick(category, 'upi')}
-  >UPI</span>
-  <span className="text-right font-medium">{fmt(b.upi)}</span>
+          <span className={`text-ink/50 ${clickable}`} onClick={() => onCellClick(category, 'upi')}>UPI</span>
+          <span className="text-right font-medium">{fmt(b.upi)}</span>
 
-  <span
-    className={`text-ink/50 ${clickable}`}
-    onClick={() => onCellClick(category, 'bank')}
-  >BANK</span>
-  <span className="text-right font-medium">{fmt(b.bank)}</span>
+          <span className={`text-ink/50 ${clickable}`} onClick={() => onCellClick(category, 'bank')}>BANK</span>
+          <span className="text-right font-medium">{fmt(b.bank)}</span>
 
-  <span
-    className={`text-ink/60 font-semibold border-t border-ink/10 pt-0.5 mt-0.5 ${clickable}`}
-    onClick={() => onCellClick(category, 'total')}
-  >TOTAL</span>
-  <span className="text-right font-semibold border-t border-ink/10 pt-0.5 mt-0.5">{fmt(b.total)}</span>
-</div>
-      </div>
-      {refund ? (
-        <div className="absolute top-2 right-2 bg-amber-100 text-amber-700 text-[10px] font-medium px-2 py-0.5 rounded-sm">
-          Refunds: {refund}
+          <span
+            className={`text-ink/60 font-semibold border-t border-ink/10 pt-0.5 mt-0.5 ${clickable}`}
+            onClick={() => onCellClick(category, 'total')}
+          >TOTAL</span>
+          <span className="text-right font-semibold border-t border-ink/10 pt-0.5 mt-0.5">{fmt(b.total)}</span>
         </div>
-      ) : null}
+      </div>
+
+      {showRefund && (
+        <div className="w-32 shrink-0 border-l border-amber-200/70 bg-amber-50/70 px-3 py-2 text-xs flex flex-col justify-center">
+          <p className="text-[10px] uppercase tracking-wide text-amber-800 font-semibold">
+            Refunds-{r.count ?? 0}
+          </p>
+          <div className="mt-1 space-y-0.5 text-[11px] text-amber-900">
+            <div className="flex justify-between">
+              <span className="text-amber-700/80">Cash</span>
+              <span className="font-medium">{fmt(r.cash)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-amber-700/80">Card</span>
+              <span className="font-medium">{fmt(r.card)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-amber-700/80">UPI</span>
+              <span className="font-medium">{fmt(r.upi)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-amber-700/80">Bank</span>
+              <span className="font-medium">{fmt(r.bank)}</span>
+            </div>
+            <div className="flex justify-between border-t border-amber-200 pt-0.5 mt-0.5 font-semibold">
+              <span>Total</span>
+              <span>{fmt(r.total)}</span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -139,9 +158,6 @@ function DueCard({ due }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// BREAKDOWN MODAL — paginated, searchable
-// ---------------------------------------------------------------------------
 const CATEGORY_LABEL = {
   op_billing:          'OP Billing',
   op_diagnostics:      'OP Diagnostics',
@@ -174,7 +190,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
   const { category, mode } = params
   const key = `${category}|${mode}|${startDate}|${endDate}`
 
-  // Load whenever the modal target changes
   if (loadedKey !== key) {
     setLoadedKey(key)
     setRows([])
@@ -205,9 +220,10 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
   const startIdx = (safePage - 1) * PAGE_SIZE
   const pageRows = filtered.slice(startIdx, startIdx + PAGE_SIZE)
 
-  const totalOf = (key) => filtered.reduce((s, r) => s + Number(r[key] || 0), 0)
+  const totalOf = (k) => filtered.reduce((s, r) => s + Number(r[k] || 0), 0)
 
   const goTo = (p) => setPage(Math.min(Math.max(1, p), totalPages))
+
   const exportCsv = () => {
     const header = ['Patient Reg No.', 'Name', 'Phone', 'Cash(₹)', 'Card(₹)', 'UPI(₹)', 'Bank(₹)', 'Total(₹)']
     const lines = [header]
@@ -220,7 +236,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
       ])
     })
     const csv = lines.map((row) => row.join(',')).join('\n')
-    // Prepend the UTF-8 BOM so Excel detects the encoding and renders ₹ correctly
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -230,7 +245,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
     URL.revokeObjectURL(url)
   }
 
-  // Pagination buttons: window of 5 around current
   const pageButtons = () => {
     const buttons = []
     const window = 5
@@ -244,7 +258,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4">
       <div className="bg-white rounded shadow-lg w-full max-w-6xl max-h-[92vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b">
           <h3 className="font-semibold text-ink">
             {CATEGORY_LABEL[category]} — {MODE_LABEL[mode]} Breakdown
@@ -269,7 +282,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
           </div>
         </div>
 
-        {/* Body */}
         <div className="overflow-auto flex-1">
           {loading && <p className="text-sm text-ink/50 p-6">Loading…</p>}
           {error && <p className="text-sm text-red-600 p-6">{error}</p>}
@@ -319,44 +331,28 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
           )}
         </div>
 
-        {/* Pagination */}
         {!loading && !error && filtered.length > 0 && (
           <div className="flex items-center justify-between px-4 py-2 border-t text-xs">
             <span className="text-ink/60">
               Showing {startIdx + 1}–{Math.min(startIdx + PAGE_SIZE, filtered.length)} of {filtered.length}
             </span>
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => goTo(1)}
-                disabled={safePage === 1}
-                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5"
-              >«</button>
-              <button
-                onClick={() => goTo(safePage - 1)}
-                disabled={safePage === 1}
-                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5"
-              >
+              <button onClick={() => goTo(1)} disabled={safePage === 1}
+                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5">«</button>
+              <button onClick={() => goTo(safePage - 1)} disabled={safePage === 1}
+                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5">
                 <ChevronLeft size={12} />
               </button>
               {pageButtons().map((p) => (
-                <button
-                  key={p}
-                  onClick={() => goTo(p)}
-                  className={`px-2 py-1 border rounded ${p === safePage ? 'bg-sky-500 text-white border-sky-500' : 'hover:bg-ink/5'}`}
-                >{p}</button>
+                <button key={p} onClick={() => goTo(p)}
+                  className={`px-2 py-1 border rounded ${p === safePage ? 'bg-sky-500 text-white border-sky-500' : 'hover:bg-ink/5'}`}>{p}</button>
               ))}
-              <button
-                onClick={() => goTo(safePage + 1)}
-                disabled={safePage === totalPages}
-                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5"
-              >
+              <button onClick={() => goTo(safePage + 1)} disabled={safePage === totalPages}
+                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5">
                 <ChevronRight size={12} />
               </button>
-              <button
-                onClick={() => goTo(totalPages)}
-                disabled={safePage === totalPages}
-                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5"
-              >»</button>
+              <button onClick={() => goTo(totalPages)} disabled={safePage === totalPages}
+                className="px-2 py-1 border rounded disabled:opacity-40 hover:bg-ink/5">»</button>
             </div>
           </div>
         )}
@@ -365,9 +361,6 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
   )
 }
 
-// ---------------------------------------------------------------------------
-// MAIN
-// ---------------------------------------------------------------------------
 export default function CollectionSummary() {
   const [startDate, setStartDate] = useState(today())
   const [endDate, setEndDate] = useState(today())
@@ -394,31 +387,34 @@ export default function CollectionSummary() {
     }
   }
 
+  // Refund is now an object per category
+  const refundOf = (key) => data?.refunds?.[key] || EMPTY_REFUND
+
   const exportCsv = () => {
     if (!data) return
-    const lines = [['Category', 'Count', 'Cash', 'Card', 'UPI', 'Bank', 'Total']]
+    const lines = [['Category', 'Count', 'Cash', 'Card', 'UPI', 'Bank', 'Total', 'Refunds']]
     const rows = [
-      ['OP Billing', data.op_billing],
-      ['OP Diagnostics', data.op_diagnostics],
-      ['OP Radiology', data.op_radiology],
-      ['Direct Patients', data.direct_patients],
-      ['Direct Diagnostics', data.direct_diagnostics],
-      ['Direct Radiology', data.direct_radiology],
-      ['IP Income', data.ip_income],
-      ['IP Diagnostics', data.ip_diagnostics],
-      ['IP Radiology', data.ip_radiology],
+      ['OP Billing', data.op_billing, 'op_billing'],
+      ['OP Diagnostics', data.op_diagnostics, 'op_diagnostics'],
+      ['OP Radiology', data.op_radiology, 'op_radiology'],
+      ['Direct Patients', data.direct_patients, 'direct_patients'],
+      ['Direct Diagnostics', data.direct_diagnostics, 'direct_diagnostics'],
+      ['Direct Radiology', data.direct_radiology, 'direct_radiology'],
+      ['IP Income', data.ip_income, 'ip_income'],
+      ['IP Diagnostics', data.ip_diagnostics, 'ip_diagnostics'],
+      ['IP Radiology', data.ip_radiology, 'ip_radiology'],
     ]
-    rows.forEach(([label, b]) => {
+    rows.forEach(([label, b, key]) => {
       const x = b || EMPTY_BUCKET
-      lines.push([label, x.count ?? 0, x.cash, x.card, x.upi, x.bank, x.total])
+      lines.push([label, x.count ?? 0, x.cash, x.card, x.upi, x.bank, x.total, refundOf(key).total])
     })
     lines.push([])
-    lines.push(['Total Income', '', '', '', '', '', data.total_income])
-    lines.push(['Expenses', '', '', '', '', '', data.expenses])
-    lines.push(['Grand Total', '', '', '', '', '', data.grand_total])
+    lines.push(['Total Income', '', '', '', '', '', data.total_income, ''])
+    lines.push(['Expenses', '', '', '', '', '', data.expenses, ''])
+    lines.push(['Grand Total', '', '', '', '', '', data.grand_total, ''])
 
     const csv = lines.map((r) => r.join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -476,22 +472,52 @@ export default function CollectionSummary() {
             />
           </div>
 
+          {/* Row 1 — OP Billing (no refund), OP Diagnostics + OP Radiology (refund) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CollectionCard icon={Footprints} theme="blue" title="OP Billing" bucket={data.op_billing} category="op_billing" onCellClick={openBreakdown} />
-            <CollectionCard icon={Microscope} theme="blue" title="OP Diagnostics" bucket={data.op_diagnostics} category="op_diagnostics" refund={data.op_refund ? fmt(data.op_refund) : 0} onCellClick={openBreakdown} />
-            <CollectionCard icon={Radio} theme="blue" title="OP Radiology" bucket={data.op_radiology} category="op_radiology" refund={data.op_refund ? fmt(data.op_refund) : 0} onCellClick={openBreakdown} />
+            <CollectionCard icon={Footprints} theme="blue" title="OP Billing"
+              bucket={data.op_billing} category="op_billing"
+              refund={refundOf('op_billing')} showRefund={false}
+              onCellClick={openBreakdown} />
+            <CollectionCard icon={Microscope} theme="blue" title="OP Diagnostics"
+              bucket={data.op_diagnostics} category="op_diagnostics"
+              refund={refundOf('op_diagnostics')} showRefund={true}
+              onCellClick={openBreakdown} />
+            <CollectionCard icon={Radio} theme="blue" title="OP Radiology"
+              bucket={data.op_radiology} category="op_radiology"
+              refund={refundOf('op_radiology')} showRefund={true}
+              onCellClick={openBreakdown} />
           </div>
 
+          {/* Row 2 — Direct Patients (no refund), Direct Diagnostics + Direct Radiology (refund) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CollectionCard icon={UserPlus} theme="green" title="Direct Patients" bucket={data.direct_patients} category="direct_patients" onCellClick={openBreakdown} />
-            <CollectionCard icon={Microscope} theme="green" title="Direct Diagnostics" bucket={data.direct_diagnostics} category="direct_diagnostics" onCellClick={openBreakdown} />
-            <CollectionCard icon={Radio} theme="green" title="Direct Radiology" bucket={data.direct_radiology} category="direct_radiology" onCellClick={openBreakdown} />
+            <CollectionCard icon={UserPlus} theme="green" title="Direct Patients"
+              bucket={data.direct_patients} category="direct_patients"
+              refund={refundOf('direct_patients')} showRefund={false}
+              onCellClick={openBreakdown} />
+            <CollectionCard icon={Microscope} theme="green" title="Direct Diagnostics"
+              bucket={data.direct_diagnostics} category="direct_diagnostics"
+              refund={refundOf('direct_diagnostics')} showRefund={true}
+              onCellClick={openBreakdown} />
+            <CollectionCard icon={Radio} theme="green" title="Direct Radiology"
+              bucket={data.direct_radiology} category="direct_radiology"
+              refund={refundOf('direct_radiology')} showRefund={true}
+              onCellClick={openBreakdown} />
           </div>
 
+          {/* Row 3 — all three IP cards show refund */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <CollectionCard icon={BedDouble} theme="navy" title="IP Income" bucket={data.ip_income} category="ip_income" onCellClick={openBreakdown} />
-            <CollectionCard icon={Microscope} theme="navy" title="IP Diagnostics" bucket={data.ip_diagnostics} category="ip_diagnostics" refund={data.ip_refund ? fmt(data.ip_refund) : 0} onCellClick={openBreakdown} />
-            <CollectionCard icon={Radio} theme="navy" title="IP Radiology" bucket={data.ip_radiology} category="ip_radiology" refund={data.ip_refund ? fmt(data.ip_refund) : 0} onCellClick={openBreakdown} />
+            <CollectionCard icon={BedDouble} theme="navy" title="IP Income"
+              bucket={data.ip_income} category="ip_income"
+              refund={refundOf('ip_income')} showRefund={true}
+              onCellClick={openBreakdown} />
+            <CollectionCard icon={Microscope} theme="navy" title="IP Diagnostics"
+              bucket={data.ip_diagnostics} category="ip_diagnostics"
+              refund={refundOf('ip_diagnostics')} showRefund={true}
+              onCellClick={openBreakdown} />
+            <CollectionCard icon={Radio} theme="navy" title="IP Radiology"
+              bucket={data.ip_radiology} category="ip_radiology"
+              refund={refundOf('ip_radiology')} showRefund={true}
+              onCellClick={openBreakdown} />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

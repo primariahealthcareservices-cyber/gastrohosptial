@@ -7,6 +7,7 @@ from routes.common_import import (
     normalize_gender, normalize_referral, normalize_payment_mode,
     get_or_create_doctor, get_or_create_patient, get_or_create_op_registration,
     get_user_id_by_name, safe_json_dump,
+    record_refund_from_row,
 )
 
 COLUMN_MAP = {
@@ -17,6 +18,8 @@ COLUMN_MAP = {
     "Due Discount": "due_discount", "BillAmount": "bill_amount", "PaidAmount": "paid_amount",
     "Due Amount": "due_amount", "Pay Mode": "pay_mode", "User Name": "user_name",
     "Referral Type": "referral_type", "Referral Doctor": "referral_doctor",
+    "Refund Request Reason":  "refund_request_reason",
+    "Refund Approved Reason": "refund_approved_reason",
 }
 
 OP_BILLS_PAYMENT_MODES = ["Cash", "Card", "UPI", "Insurance", "Credit", "Bank"]
@@ -71,6 +74,21 @@ def _strip_junk_rows(raw_df, date_col="Date"):
     mask = raw_df[date_col].apply(_looks_like_date)
     cleaned = raw_df[mask]
     return cleaned, before - len(cleaned)
+
+
+def _refund_category_for_invoice(invoice_no):
+    """
+    Decide which Collection Summary card a refund belongs to, based on the
+    invoice prefix. Mirrors `_route_op_bill` in the dashboard.
+    """
+    bn = (invoice_no or "").upper()
+    if bn.startswith("OPR"):
+        return "op_radiology"
+    if bn.startswith(("OPINV", "OPDINV", "OPIN")):
+        return "op_diagnostics"
+    if bn.startswith("INV"):
+        return "op_billing"
+    return "op_diagnostics"   # default for the OPD-diagnostics importer
 
 
 def upsert_opd_diagnostics_bill(cur, invoice_no, patient_id, op_registration_id,
@@ -199,6 +217,24 @@ def process_opd_diagnostics_batch(batch_id, filepath):
                 if was_inserted:
                     insert_opd_items(cur, op_reg_id, investigations, rate_map,
                                      bill_date, to_decimal(row.get("total_amount")), item_count)
+
+                    # ── Record refund (only for freshly-inserted bills) ──
+                    try:
+                        invoice_no = row.get("invoice_no")
+                        record_refund_from_row(
+                            cur,
+                            bill_type="OP",
+                            bill_no=invoice_no,
+                            category=_refund_category_for_invoice(invoice_no),
+                            amount=to_decimal(row.get("total_amount")),
+                            pay_mode=row.get("pay_mode"),
+                            request_reason=row.get("refund_request_reason"),
+                            approved_reason=row.get("refund_approved_reason"),
+                            performed_by=created_by,
+                            bill_date=bill_date,
+                        )
+                    except Exception:
+                        conn.rollback()
 
                 conn.commit()
                 inserted += 1 if was_inserted else 0
