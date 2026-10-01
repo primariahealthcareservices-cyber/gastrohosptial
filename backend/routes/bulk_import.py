@@ -14,6 +14,7 @@ from routes.import_service_radiology import start_radiology_import_job
 from routes.import_service_opd_diagnostics import start_opd_diagnostics_import_job
 from routes.import_service_daily_summary import start_daily_summary_import_job
 from routes.import_service_refunds import start_refunds_import_job
+from routes.import_service_cancellations import start_cancellations_import_job   # ← new
 
 # Optional PDF support — install with: pip install reportlab
 try:
@@ -36,12 +37,14 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # Single source of truth — do NOT redefine this further down the file.
 IMPORT_HANDLERS = {
-    "opd_bills":       start_import_job,
-    "lab_bills":       start_lab_import_job,
-    "radiology_bills": start_radiology_import_job,
-    "opd_diagnostics": start_opd_diagnostics_import_job,
-    "daily_summary":   start_daily_summary_import_job,
-    "refunds":         start_refunds_import_job,   # ← new
+    "opd_bills":               start_import_job,
+    "lab_bills":               start_lab_import_job,
+    "radiology_bills":         start_radiology_import_job,
+    "opd_diagnostics":         start_opd_diagnostics_import_job,
+    "daily_summary":           start_daily_summary_import_job,
+    "refunds":                 start_refunds_import_job,
+    "cancellations_lab":       start_cancellations_import_job,   # ← new
+    "cancellations_radiology": start_cancellations_import_job,   # ← new
 }
 
 
@@ -126,7 +129,6 @@ def get_daily_collection():
         (from_date, to_date), many=True,
     ) or []
 
-    # Coerce dates/decimals to JSON-safe types
     for r in rows:
         if r.get("summary_date"):
             r["summary_date"] = r["summary_date"].isoformat()
@@ -212,12 +214,6 @@ BILL_TYPES = {
 
 
 def _fetch_bills(bill_type: str, from_date: str, to_date: str):
-    """
-    Fetch bills for the given type between [from_date, to_date] inclusive.
-    Uses a raw buffered cursor instead of pandas.read_sql to avoid the
-    SQLAlchemy UserWarning and to keep DB drivers identical to the rest of
-    the app.
-    """
     cfg = BILL_TYPES[bill_type]
     sql = f"""
         SELECT
@@ -284,16 +280,12 @@ def _rows_to_csv(rows, columns):
 
 
 def _cell_value(v):
-    """Preserve numeric types for Excel so SUM() works out of the box.
-    Dates become plain strings (Excel auto-detects them). None becomes ''."""
     if v is None:
         return ""
     if isinstance(v, datetime):
         return v.strftime("%Y-%m-%d %H:%M:%S")
-    # Leave ints, floats, and Decimals alone — Excel needs them as numbers
     if isinstance(v, (int, float)):
         return v
-    # Handle Decimal (MySQL DECIMAL columns come back as Decimal objects)
     from decimal import Decimal as _Decimal
     if isinstance(v, _Decimal):
         return float(v)
@@ -342,9 +334,7 @@ def _rows_to_pdf(rows, columns, title, from_date, to_date):
 
     data = [[label for _, label in columns]]
     for r in rows:
-        data.append([
-            _stringify(r.get(key)) for key, _ in columns
-        ])
+        data.append([_stringify(r.get(key)) for key, _ in columns])
 
     table = Table(data, repeatRows=1)
     table.setStyle(TableStyle([

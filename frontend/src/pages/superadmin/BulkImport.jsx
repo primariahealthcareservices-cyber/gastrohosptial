@@ -3,13 +3,15 @@ import ImportBills from "./ImportOPDBills";
 import ExportOPDBills from "./ExportOPDBills";
 
 const TABS = [
-  { key: "opd",             label: "Import OPD Bills" },
-  { key: "opd_diagnostics", label: "Import OPD Diagnostics" },
-  { key: "lab",             label: "Import Lab Bills" },
-  { key: "radiology",       label: "Import Radiology Bills" },
-  { key: "daily_summary",   label: "Import Daily Summary" },
-  { key: "refunds",         label: "Import Refunds" },       // ← new
-  { key: "export",          label: "Export Bills" },
+  { key: "opd",                     label: "Import OPD Bills" },
+  { key: "opd_diagnostics",         label: "Import OPD Diagnostics" },
+  { key: "lab",                     label: "Import Lab Bills" },
+  { key: "radiology",               label: "Import Radiology Bills" },
+  { key: "daily_summary",           label: "Import Daily Summary" },
+  { key: "refunds",                 label: "Import Refunds" },
+  { key: "cancellations_lab",       label: "Import Cancellations — Lab" },        // ← new
+  { key: "cancellations_radiology", label: "Import Cancellations — Radiology" },  // ← new
+  { key: "export",                  label: "Export Bills" },
 ];
 
 export default function BulkImport() {
@@ -55,10 +57,22 @@ export default function BulkImport() {
           label="Import Daily Collection Summary CSV/Excel (Date + all counts + totals)"
         />
       )}
-      {tab === "refunds" && (                                           /* ← new */
+      {tab === "refunds" && (
         <ImportBills
           importType="refunds"
           label="Import Refunds CSV/Excel (Invoice Number + Amount + Reasons)"
+        />
+      )}
+      {tab === "cancellations_lab" && (
+        <ImportBills
+          importType="cancellations_lab"
+          label="Import Cancelled Lab Bills CSV/Excel (Invoice No + Cancelled Amount + Reason)"
+        />
+      )}
+      {tab === "cancellations_radiology" && (
+        <ImportBills
+          importType="cancellations_radiology"
+          label="Import Cancelled Radiology Bills CSV/Excel (Invoice No + Cancelled Amount + Reason)"
         />
       )}
       {tab === "export" && <ExportOPDBills />}

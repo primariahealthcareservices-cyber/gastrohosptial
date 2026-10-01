@@ -103,7 +103,6 @@ def normalize_payment_mode(val, allowed):
     for opt in allowed:
         if opt.lower() == token:
             return opt
-    # loose contains-match fallback (e.g. "upi" in "upi - phonepe")
     for opt in allowed:
         if opt.lower() in s.lower():
             return opt
@@ -155,34 +154,29 @@ def get_or_create_op_registration(cur, patient_id, doctor_id, opd_reg_no, title,
     return cur.lastrowid
 
 
-def get_user_id_by_name(cur, name):
-    """Looks up an existing user by name — never auto-creates login accounts."""
+def get_user_id_by_name(cur, name, default_id=None):
+    """
+    Look up an existing user by name — never auto-creates login accounts.
+    Case-insensitive, whitespace-trimmed. Returns `default_id` if the name
+    doesn't match anything (or is blank).
+    """
     n = clean_str(name)
     if not n:
-        return None
-    cur.execute("SELECT id FROM users WHERE name = %s", (n,))
+        return default_id
+
+    cur.execute(
+        "SELECT id FROM users WHERE LOWER(TRIM(name)) = LOWER(TRIM(%s)) LIMIT 1",
+        (n,),
+    )
     row = cur.fetchone()
-    return row["id"] if row else None
+    return row["id"] if row else default_id
 
 
 def safe_json_dump(row_dict):
-    """Serialize a row to JSON safely for storage in a MySQL JSON column.
-
-    pandas represents blank/missing CSV cells as float('nan'). Python's
-    json.dumps() allows NaN/Infinity by default and writes them as bare
-    tokens (NaN, Infinity, -Infinity) — which is NOT valid JSON per spec,
-    and MySQL's native JSON column type rejects it with:
-        Invalid JSON text: "Invalid value."
-    That failure used to happen *inside* the except block that logs
-    import errors, with nothing catching it — killing the whole import
-    thread. This version converts NaN/inf floats to None (-> JSON null)
-    before dumping, and sets allow_nan=False as a belt-and-braces check
-    so any leftover non-finite float raises immediately and falls into
-    the fallback branch instead of producing invalid JSON.
-    """
+    """Serialize a row to JSON safely for storage in a MySQL JSON column."""
     def _clean(v):
         if isinstance(v, float) and (v != v or v in (float("inf"), float("-inf"))):
-            return None  # NaN / inf / -inf -> null, which is valid JSON
+            return None
         return v
 
     try:
@@ -190,12 +184,11 @@ def safe_json_dump(row_dict):
         return json.dumps(cleaned, default=str, allow_nan=False)
     except Exception:
         return json.dumps({"error": "could not serialize row"})
+
+
 # ---------------------------------------------------------------------------
 # REFUND HELPERS (bulk-import)
 # ---------------------------------------------------------------------------
-# These helpers let any import service record an Advance_Refund row when the
-# CSV row carries refund reasons (either "Refund Request Reason",
-# "Refund Approved Reason", or both).
 
 VALID_REFUND_CATEGORIES = {
     "op_billing", "op_diagnostics", "op_radiology",
@@ -203,16 +196,17 @@ VALID_REFUND_CATEGORIES = {
     "ip_income", "ip_diagnostics", "ip_radiology",
 }
 
-VALID_REFUND_MODES = {"Cash", "Card", "UPI", "Bank"}
+# Now includes Insurance as a first-class mode.
+VALID_REFUND_MODES = {"Cash", "Card", "UPI", "Bank", "Insurance"}
+
 
 def normalize_refund_mode(pay_mode):
     """
-    Normalize any free-text pay mode to one of: Cash / Card / UPI / Bank.
+    Normalize any free-text pay mode to one of:
+        Cash / Card / UPI / Bank / Insurance
 
-    Tolerant of real-world variants:
-      UPI, upi, UPI - PhonePe, UPI/GPay, PhonePe, GPay, Google Pay,
-      Paytm, BHIM, Card, Credit Card, Debit Card, Visa, RuPay, Bank,
-      NEFT, RTGS, IMPS, Cheque, Cash, etc.
+    Tolerant of variants like 'UPI - PhonePe', 'UPI/GPay', 'PhonePe',
+    'Insurance', 'Mediclaim', 'TPA', etc.
     """
     m = (clean_str(pay_mode) or "").lower()
 
@@ -228,6 +222,35 @@ def normalize_refund_mode(pay_mode):
         return "UPI"
     if m == "bank":
         return "Bank"
+    if m == "insurance":
+        return "Insurance"
+
+    # --- Insurance variants (checked before Card, since "insurance card" would match both) ---
+    if (
+        "insurance" in m
+        or "mediclaim" in m
+        or "mediclaim" in m
+        or "tpa" in m
+        or "tpa_" in m
+        or "cashless" in m
+        or "reimburs" in m
+        or "esic" in m
+        or "cghs" in m
+        or "star health" in m
+        or "hdfc ergo" in m
+        or "icici lombard" in m
+        or "bajaj allianz" in m
+        or "new india" in m
+        or "national insurance" in m
+        or "oriental insurance" in m
+        or "united india" in m
+        or "reliance general" in m
+        or "tata aig" in m
+        or "sbi general" in m
+        or "care health" in m
+        or "niva bupa" in m
+    ):
+        return "Insurance"
 
     # --- UPI variants ---
     if (
@@ -260,15 +283,41 @@ def normalize_refund_mode(pay_mode):
     ):
         return "Bank"
 
-    # --- Cash fallback ---
     return "Cash"
 
+
 def _resolve_bill_id(cur, bill_type, bill_no):
-    """bill_no -> op_bills.id / ip_bills.id. Returns None if not found."""
+    """
+    Resolve an invoice number to its bill_id.
+    Looks in op_bills AND ip_bills, using the prefix as a hint but
+    falling back to the other table if the prefix hint doesn't match.
+    Returns the integer id or None.
+    """
     if not clean_str(bill_no):
         return None
-    table = "op_bills" if bill_type == "OP" else "ip_bills"
-    cur.execute(f"SELECT id FROM {table} WHERE bill_no=%s", (bill_no,))
+
+    bn = str(bill_no).strip()
+    bn_upper = bn.upper()
+
+    is_ip_prefix = bn_upper.startswith(("IPDINV", "IPRINV", "IPINV", "IPD", "IPR"))
+
+    if is_ip_prefix:
+        cur.execute("SELECT id FROM ip_bills WHERE bill_no=%s", (bn,))
+        row = cur.fetchone()
+        if row:
+            return row["id"]
+        # Fall back to op_bills (some data stores IP invoices here)
+        cur.execute("SELECT id FROM op_bills WHERE bill_no=%s", (bn,))
+        row = cur.fetchone()
+        return row["id"] if row else None
+
+    # Non-IP prefix: try op_bills first, then ip_bills
+    cur.execute("SELECT id FROM op_bills WHERE bill_no=%s", (bn,))
+    row = cur.fetchone()
+    if row:
+        return row["id"]
+
+    cur.execute("SELECT id FROM ip_bills WHERE bill_no=%s", (bn,))
     row = cur.fetchone()
     return row["id"] if row else None
 
@@ -284,19 +333,10 @@ def record_refund_from_row(cur, *,
                             performed_by,
                             bill_date):
     """
-    Insert an Advance_Refund row into billing_actions if the row carries
-    refund reasons. Returns the new action id, or None if there's nothing
-    to record.
+    Insert an Advance_Refund row into billing_actions.
 
-      bill_type        : 'OP' or 'IP'
-      bill_no          : invoice number (used to resolve bill_id)
-      category         : one of VALID_REFUND_CATEGORIES
-      amount           : numeric (>= 0)
-      pay_mode         : Cash / Card / UPI / Bank
-      request_reason   : text or None
-      approved_reason  : text or None
-      performed_by     : user id (int) or None
-      bill_date        : datetime for created_at
+    Idempotency: if the bill already has an Advance_Refund row, we return
+    the existing row's id without inserting a duplicate.
     """
     req  = clean_str(request_reason)
     appr = clean_str(approved_reason)
@@ -306,9 +346,17 @@ def record_refund_from_row(cur, *,
 
     bill_id = _resolve_bill_id(cur, bill_type, bill_no)
     if bill_id is None:
-        # The bill hasn't been written yet or the invoice number doesn't
-        # match anything. Skip silently — never break the row import.
         return None
+
+    # ── Idempotency: skip if this bill already has a refund ──
+    cur.execute("""
+        SELECT id FROM billing_actions
+        WHERE action_type = 'Advance_Refund' AND bill_id = %s
+        LIMIT 1
+    """, (bill_id,))
+    existing = cur.fetchone()
+    if existing:
+        return existing["id"]
 
     if category not in VALID_REFUND_CATEGORIES:
         category = "ip_income" if bill_type == "IP" else "op_billing"

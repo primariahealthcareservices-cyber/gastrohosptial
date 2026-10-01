@@ -7,10 +7,14 @@ import {
 import api from '../../api/axios'
 import { Section } from '../PageHeader'
 
-const today = () => new Date().toISOString().slice(0, 10)
+// Default range covers all historical refunds (Jan 2025 → end of 2026).
+const defaultStartDate = () => '2025-01-01'
+const defaultEndDate   = () => '2026-12-31'
 
 const EMPTY_BUCKET = { cash: 0, card: 0, upi: 0, bank: 0, total: 0, count: 0 }
-const EMPTY_REFUND = { cash: 0, card: 0, upi: 0, bank: 0, total: 0, count: 0 }
+const EMPTY_REFUND = {
+  cash: 0, card: 0, upi: 0, bank: 0, insurance: 0, total: 0, count: 0,
+}
 
 const fmt = (n) =>
   `₹${Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
@@ -49,6 +53,7 @@ function CollectionCard({
   const b = bucket || EMPTY_BUCKET
   const r = refund || EMPTY_REFUND
   const clickable = 'cursor-pointer hover:underline hover:text-teal-700'
+  const showInsurance = Number(r.insurance || 0) > 0
 
   return (
     <div className={`flex items-stretch rounded-sm border ${t.border} ${t.bg} overflow-hidden`}>
@@ -103,6 +108,12 @@ function CollectionCard({
               <span className="text-amber-700/80">Bank</span>
               <span className="font-medium">{fmt(r.bank)}</span>
             </div>
+            {showInsurance && (
+              <div className="flex justify-between">
+                <span className="text-amber-700/80">Insurance</span>
+                <span className="font-medium">{fmt(r.insurance)}</span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-amber-200 pt-0.5 mt-0.5 font-semibold">
               <span>Total</span>
               <span>{fmt(r.total)}</span>
@@ -171,11 +182,12 @@ const CATEGORY_LABEL = {
 }
 
 const MODE_LABEL = {
-  cash:  'Cash',
-  card:  'Card',
-  upi:   'UPI',
-  bank:  'Bank',
-  total: 'Total',
+  cash:      'Cash',
+  card:      'Card',
+  upi:       'UPI',
+  bank:      'Bank',
+  insurance: 'Insurance',
+  total:     'Total',
 }
 
 function BreakdownModal({ open, onClose, params, startDate, endDate }) {
@@ -225,14 +237,15 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
   const goTo = (p) => setPage(Math.min(Math.max(1, p), totalPages))
 
   const exportCsv = () => {
-    const header = ['Patient Reg No.', 'Name', 'Phone', 'Cash(₹)', 'Card(₹)', 'UPI(₹)', 'Bank(₹)', 'Total(₹)']
+    const header = ['Patient Reg No.', 'Name', 'Phone',
+                    'Cash(₹)', 'Card(₹)', 'UPI(₹)', 'Bank(₹)', 'Insurance(₹)', 'Total(₹)']
     const lines = [header]
     filtered.forEach((r) => {
       lines.push([
         r.patient_reg_no || '',
         (r.name || '').replace(/,/g, ' '),
         r.phone || '',
-        r.cash, r.card, r.upi, r.bank, r.total,
+        r.cash, r.card, r.upi, r.bank, r.insurance, r.total,
       ])
     })
     const csv = lines.map((row) => row.join(',')).join('\n')
@@ -300,6 +313,7 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
                   <th className="text-right px-3 py-2 font-medium">Card(₹)</th>
                   <th className="text-right px-3 py-2 font-medium">UPI(₹)</th>
                   <th className="text-right px-3 py-2 font-medium">Bank(₹)</th>
+                  <th className="text-right px-3 py-2 font-medium">Insurance(₹)</th>
                   <th className="text-right px-3 py-2 font-medium">Total(₹)</th>
                 </tr>
               </thead>
@@ -313,6 +327,7 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
                     <td className="px-3 py-1.5 text-right">{Number(r.card).toLocaleString('en-IN')}</td>
                     <td className="px-3 py-1.5 text-right">{Number(r.upi).toLocaleString('en-IN')}</td>
                     <td className="px-3 py-1.5 text-right">{Number(r.bank).toLocaleString('en-IN')}</td>
+                    <td className="px-3 py-1.5 text-right">{Number(r.insurance || 0).toLocaleString('en-IN')}</td>
                     <td className="px-3 py-1.5 text-right">{Number(r.total).toLocaleString('en-IN')}</td>
                   </tr>
                 ))}
@@ -324,6 +339,7 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
                   <td className="px-3 py-2 text-right">{totalOf('card').toLocaleString('en-IN')}</td>
                   <td className="px-3 py-2 text-right">{totalOf('upi').toLocaleString('en-IN')}</td>
                   <td className="px-3 py-2 text-right">{totalOf('bank').toLocaleString('en-IN')}</td>
+                  <td className="px-3 py-2 text-right">{totalOf('insurance').toLocaleString('en-IN')}</td>
                   <td className="px-3 py-2 text-right">{totalOf('total').toLocaleString('en-IN')}</td>
                 </tr>
               </tfoot>
@@ -362,8 +378,8 @@ function BreakdownModal({ open, onClose, params, startDate, endDate }) {
 }
 
 export default function CollectionSummary() {
-  const [startDate, setStartDate] = useState(today())
-  const [endDate, setEndDate] = useState(today())
+  const [startDate, setStartDate] = useState(defaultStartDate())
+  const [endDate, setEndDate] = useState(defaultEndDate())
   const [clinic, setClinic] = useState('All')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -387,12 +403,11 @@ export default function CollectionSummary() {
     }
   }
 
-  // Refund is now an object per category
   const refundOf = (key) => data?.refunds?.[key] || EMPTY_REFUND
 
   const exportCsv = () => {
     if (!data) return
-    const lines = [['Category', 'Count', 'Cash', 'Card', 'UPI', 'Bank', 'Total', 'Refunds']]
+    const lines = [['Category', 'Count', 'Cash', 'Card', 'UPI', 'Bank', 'Insurance', 'Total', 'Refunds']]
     const rows = [
       ['OP Billing', data.op_billing, 'op_billing'],
       ['OP Diagnostics', data.op_diagnostics, 'op_diagnostics'],
@@ -406,12 +421,12 @@ export default function CollectionSummary() {
     ]
     rows.forEach(([label, b, key]) => {
       const x = b || EMPTY_BUCKET
-      lines.push([label, x.count ?? 0, x.cash, x.card, x.upi, x.bank, x.total, refundOf(key).total])
+      lines.push([label, x.count ?? 0, x.cash, x.card, x.upi, x.bank, '', x.total, refundOf(key).total])
     })
     lines.push([])
-    lines.push(['Total Income', '', '', '', '', '', data.total_income, ''])
-    lines.push(['Expenses', '', '', '', '', '', data.expenses, ''])
-    lines.push(['Grand Total', '', '', '', '', '', data.grand_total, ''])
+    lines.push(['Total Income', '', '', '', '', '', '', data.total_income, ''])
+    lines.push(['Expenses', '', '', '', '', '', '', data.expenses, ''])
+    lines.push(['Grand Total', '', '', '', '', '', '', data.grand_total, ''])
 
     const csv = lines.map((r) => r.join(',')).join('\n')
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -472,7 +487,6 @@ export default function CollectionSummary() {
             />
           </div>
 
-          {/* Row 1 — OP Billing (no refund), OP Diagnostics + OP Radiology (refund) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CollectionCard icon={Footprints} theme="blue" title="OP Billing"
               bucket={data.op_billing} category="op_billing"
@@ -488,7 +502,6 @@ export default function CollectionSummary() {
               onCellClick={openBreakdown} />
           </div>
 
-          {/* Row 2 — Direct Patients (no refund), Direct Diagnostics + Direct Radiology (refund) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CollectionCard icon={UserPlus} theme="green" title="Direct Patients"
               bucket={data.direct_patients} category="direct_patients"
@@ -504,7 +517,6 @@ export default function CollectionSummary() {
               onCellClick={openBreakdown} />
           </div>
 
-          {/* Row 3 — all three IP cards show refund */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <CollectionCard icon={BedDouble} theme="navy" title="IP Income"
               bucket={data.ip_income} category="ip_income"
