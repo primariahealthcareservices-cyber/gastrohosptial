@@ -42,3 +42,13 @@ def by_barcode(code):
     if not row:
         return jsonify({"error": "Item not found for this barcode"}), 404
     return jsonify(row)
+@pharmacy_items_bp.route("/all-names", methods=["GET"])
+@jwt_required()
+def all_item_names():
+    rows = query(
+        "SELECT id, name, mrp, old_tax_percent, new_tax_percent "
+        "FROM pharmacy_items WHERE is_active=1 "
+        "GROUP BY name ORDER BY name ASC",
+        many=True
+    ) or []
+    return jsonify(rows)

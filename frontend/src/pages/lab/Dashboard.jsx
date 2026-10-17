@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FileBarChart, Clock, CheckCircle, AlertCircle } from 'lucide-react'
+import { FileBarChart, Clock, CheckCircle } from 'lucide-react'
 import api from '../../api/axios'
 import { PageHeader } from '../../components/PageHeader'
 
@@ -9,11 +9,10 @@ export default function LabDashboard() {
     op_completed: 0,
     ip_pending: 0,
     ip_completed: 0,
-    total: 0
+    total: 0,
   })
 
   useEffect(() => {
-    // Fetch OP stats
     api.get('/lab-reports/op?status=Pending').then(res => {
       setStats(prev => ({ ...prev, op_pending: res.data.length }))
     }).catch(console.error)
@@ -28,7 +27,8 @@ export default function LabDashboard() {
     }).catch(console.error)
   }, [])
 
-  const total = stats.op_pending + stats.op_completed + stats.ip_pending + stats.ip_completed
+  const total =
+    stats.op_pending + stats.op_completed + stats.ip_pending + stats.ip_completed
 
   return (
     <div>
@@ -46,6 +46,7 @@ export default function LabDashboard() {
             </div>
           </div>
         </div>
+
         <div className="bg-white border border-border rounded-sm p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-50 rounded-full">
@@ -57,6 +58,7 @@ export default function LabDashboard() {
             </div>
           </div>
         </div>
+
         <div className="bg-white border border-border rounded-sm p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-amber-50 rounded-full">
@@ -68,6 +70,7 @@ export default function LabDashboard() {
             </div>
           </div>
         </div>
+
         <div className="bg-white border border-border rounded-sm p-4 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-green-50 rounded-full">

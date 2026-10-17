@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { LayoutDashboard, FileBarChart, LogOut, Menu, X } from 'lucide-react'
+import { LayoutDashboard, FileBarChart, FlaskConical, LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 export default function LabSidebar() {
@@ -21,9 +21,10 @@ export default function LabSidebar() {
     }`
 
   const navLinks = [
-    { to: '/lab/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { to: '/lab/op-reports', label: 'OP Reports', icon: FileBarChart },
-    { to: '/lab/ip-reports', label: 'IP Reports', icon: FileBarChart },
+    { to: '/lab/dashboard',   label: 'Dashboard',  icon: LayoutDashboard },
+    { to: '/lab/op-reports',  label: 'OP Reports', icon: FileBarChart },
+    { to: '/lab/ip-reports',  label: 'IP Reports', icon: FileBarChart },
+    { to: '/lab/test-master', label: 'Lab Tests',  icon: FlaskConical }, // 👈 NEW
   ]
 
   return (

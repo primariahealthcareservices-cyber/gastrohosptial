@@ -60,6 +60,12 @@ import OPReports from './pages/lab/OPReports'
 import IPReports from './pages/lab/IPReports'
 import LabTests from './pages/superadmin/LabTests'
 import BulkImport from './pages/superadmin/BulkImport'
+import TestMaster from './pages/lab/TestMaster'
+import InventoryType from './pages/pharmacy/masters/InventoryType'
+import ItemType from './pages/pharmacy/masters/ItemType'
+import ManufacturerMaster from './pages/pharmacy/ManufacturerMaster'
+import PurchaseOrder from './pages/pharmacy/PurchaseOrder'
+
 function withLayout(el) {
   return <Layout>{el}</Layout>
 }
@@ -67,13 +73,7 @@ function withPharmacyLayout(el) {
   return <PharmacyLayout>{el}</PharmacyLayout>
 }
 
-// Executive-side pages: executive, admin, and super_admin can all reach these.
 const EXEC_ROLES = ['executive', 'admin', 'super_admin']
-
-// Pharmacy-side pages: the dedicated pharmacy role, plus admin and
-// super_admin (per your requirement — admin/superadmin see everything).
-// 'executive' is deliberately NOT included, so an executive user has no
-// route access to /pharmacy/* even by typing the URL directly.
 const PHARMACY_ROLES = ['pharmacy', 'admin', 'super_admin']
 
 const PLACEHOLDERS = [
@@ -86,15 +86,12 @@ const PLACEHOLDERS = [
 ]
 
 const PHARMACY_PLACEHOLDERS = [
-  ['Inventory Type', '/pharmacy/masters/inventory-type'],
-  ['Item Type', '/pharmacy/masters/item-type'],
-  ['Manufacturer', '/pharmacy/masters/manufacturer'],
+  // Inventory Type, Item Type, Manufacturer, and Purchase Order now have real routes below
   ['Tax Categories', '/pharmacy/masters/tax-categories'],
   ['Rack Master', '/pharmacy/masters/rack-master'],
   ['Item Master', '/pharmacy/masters/item-master'],
   ['Item Package Master', '/pharmacy/masters/item-package-master'],
   ['Drug Combination', '/pharmacy/masters/drug-combination'],
-  ['Purchase Order', '/pharmacy/transaction/purchase-order'],
   ['Stock Returns', '/pharmacy/transaction/stock-returns'],
   ['Inpatient Sales Returns', '/pharmacy/sales-returns/inpatient'],
   ['Outpatient Sales Returns', '/pharmacy/sales-returns/outpatient'],
@@ -224,14 +221,14 @@ export default function App() {
           <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<DischargeSummary />)}</ProtectedRoute>
         } />
         <Route path="/executive/op-lab" element={
-  <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPLabPage />)}</ProtectedRoute>
-} />
-<Route path="/executive/op-services" element={
-  <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPServicesPage />)}</ProtectedRoute>
-} />
-<Route path="/executive/op-procedures" element={
-  <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPProceduresPage />)}</ProtectedRoute>
-} />
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPLabPage />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/op-services" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPServicesPage />)}</ProtectedRoute>
+        } />
+        <Route path="/executive/op-procedures" element={
+          <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<OPProceduresPage />)}</ProtectedRoute>
+        } />
 
         {/* Reports */}
         <Route path="/executive/reports/ip-lab" element={
@@ -251,11 +248,40 @@ export default function App() {
         <Route path="/pharmacy/dashboard" element={
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyDashboard />)}</ProtectedRoute>
         } />
+
+        {/* Real master pages (must come BEFORE placeholders so they win the match) */}
+        <Route path="/pharmacy/masters/inventory-type" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InventoryType />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/masters/item-type" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ItemType />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/masters/manufacturer" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ManufacturerMaster />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/masters/supplier" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SupplierMaster />)}</ProtectedRoute>
+        } />
+
+        {/* Real transaction pages */}
+        <Route path="/pharmacy/transaction/purchase-order" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PurchaseOrder />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/transaction/goods-receive-note" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GoodsReceiveNote />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/transaction/stock-adjustments" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockAdjustments />)}</ProtectedRoute>
+        } />
+
+        {/* Placeholders — anything not defined above falls into Coming Soon */}
         {PHARMACY_PLACEHOLDERS.map(([label, path]) => (
           <Route key={path} path={path} element={
             <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyComingSoon title={label} />)}</ProtectedRoute>
           } />
         ))}
+
+        {/* Pharmacy sales pages */}
         <Route path="/pharmacy/sales/inpatient" element={
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InpatientSales />)}</ProtectedRoute>
         } />
@@ -268,43 +294,43 @@ export default function App() {
         <Route path="/pharmacy/sales/ot-indents" element={
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OTIndents />)}</ProtectedRoute>
         } />
-        <Route path="/pharmacy/transaction/goods-receive-note" element={
-  <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GoodsReceiveNote />)}</ProtectedRoute>
-} />
-<Route path="/pharmacy/transaction/stock-adjustments" element={
-  <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockAdjustments />)}</ProtectedRoute>
-} />
-<Route path="/pharmacy/masters/supplier" element={
-  <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SupplierMaster />)}</ProtectedRoute>
-} />
-<Route path="/superadmin/doctors" element={
-  <ProtectedRoute roles={['super_admin']}>{withLayout(<DoctorMaster />)}</ProtectedRoute>
-} />
-<Route path="/superadmin/permission-profiles" element={
-  <ProtectedRoute roles={['super_admin']}>{withLayout(<PermissionProfiles />)}</ProtectedRoute>
-} />
 
-{/* Lab Technician Routes */}
-<Route path="/lab" element={<LabLayout />}>
-  <Route index element={<Navigate to="/lab/dashboard" replace />} />
-  <Route path="dashboard" element={
-    <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><LabDashboard /></ProtectedRoute>
-  } />
-  <Route path="op-reports" element={
-    <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><OPReports /></ProtectedRoute>
-  } />
-  <Route path="ip-reports" element={
-    <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><IPReports /></ProtectedRoute>
-  } />
-</Route>
-<Route path="/superadmin/lab-tests" element={
-  <ProtectedRoute roles={['super_admin']}>{withLayout(<LabTests />)}</ProtectedRoute>
-} />
-<Route path="/superadmin/bulk-import" element={
-  <ProtectedRoute roles={['super_admin']}>{withLayout(<BulkImport />)}</ProtectedRoute>
-} />
+        {/* Super Admin Masters */}
+        <Route path="/superadmin/doctors" element={
+          <ProtectedRoute roles={['super_admin']}>{withLayout(<DoctorMaster />)}</ProtectedRoute>
+        } />
+        <Route path="/superadmin/permission-profiles" element={
+          <ProtectedRoute roles={['super_admin']}>{withLayout(<PermissionProfiles />)}</ProtectedRoute>
+        } />
 
-        {/* Placeholders */}
+        {/* ============================================================
+            LAB TECHNICIAN ROUTES
+            ============================================================ */}
+        <Route path="/lab" element={<LabLayout />}>
+          <Route index element={<Navigate to="/lab/dashboard" replace />} />
+          <Route path="dashboard" element={
+            <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><LabDashboard /></ProtectedRoute>
+          } />
+          <Route path="op-reports" element={
+            <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><OPReports /></ProtectedRoute>
+          } />
+          <Route path="ip-reports" element={
+            <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><IPReports /></ProtectedRoute>
+          } />
+          <Route path="test-master" element={
+            <ProtectedRoute roles={['lab_technician', 'super_admin', 'admin']}><TestMaster /></ProtectedRoute>
+          } />
+        </Route>
+
+        {/* Super Admin Lab */}
+        <Route path="/superadmin/lab-tests" element={
+          <ProtectedRoute roles={['super_admin']}>{withLayout(<LabTests />)}</ProtectedRoute>
+        } />
+        <Route path="/superadmin/bulk-import" element={
+          <ProtectedRoute roles={['super_admin']}>{withLayout(<BulkImport />)}</ProtectedRoute>
+        } />
+
+        {/* Executive placeholders */}
         {PLACEHOLDERS.map(([label, path]) => (
           <Route key={path} path={path} element={
             <ProtectedRoute roles={EXEC_ROLES}>{withLayout(<ComingSoon title={label} />)}</ProtectedRoute>
