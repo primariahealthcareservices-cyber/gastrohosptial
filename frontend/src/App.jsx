@@ -41,9 +41,11 @@ import IPProceduresPage from './pages/executive/IPProceduresPage'
 import PharmacyLayout from './components/pharmacy/PharmacyLayout'
 import PharmacyDashboard from './pages/pharmacy/Dashboard'
 import PharmacyComingSoon from './pages/pharmacy/ComingSoon'
-import InpatientSales from './pages/pharmacy/InpatientSales'
-import OutpatientSales from './pages/pharmacy/OutpatientSales'
-import PatientIndents from './pages/pharmacy/PatientIndents'
+import PharmacyIPSales from './pages/pharmacy/masters/PharmacyIPSales'
+import PharmacyOPSales from './pages/pharmacy/masters/PharmacyOPSales'
+import PharmacyPatientIndents from './pages/pharmacy/masters/PharmacyPatientIndents'
+import DuplicateInvoice from './pages/pharmacy/masters/DuplicateInvoice' 
+
 import OTIndents from './pages/pharmacy/OTIndents'
 import DischargeSummary from './pages/executive/DischargeSummary'
 import OPLabPage from './pages/executive/OPLabPage'
@@ -52,6 +54,7 @@ import OPProceduresPage from './pages/executive/OPProceduresPage'
 import GoodsReceiveNote from './pages/pharmacy/GoodsReceiveNote'
 import StockAdjustments from './pages/pharmacy/StockAdjustments'
 import SupplierMaster from './pages/pharmacy/SupplierMaster'
+
 import DoctorMaster from './pages/superadmin/DoctorMaster'
 import PermissionProfiles from './pages/superadmin/PermissionProfiles'
 import LabLayout from './components/lab/LabLayout'
@@ -65,6 +68,20 @@ import InventoryType from './pages/pharmacy/masters/InventoryType'
 import ItemType from './pages/pharmacy/masters/ItemType'
 import ManufacturerMaster from './pages/pharmacy/ManufacturerMaster'
 import PurchaseOrder from './pages/pharmacy/PurchaseOrder'
+
+import InpatientSalesReturns from './pages/pharmacy/InpatientSalesReturns'
+import OutpatientSalesReturns from './pages/pharmacy/OutpatientSalesReturns'
+
+// ✅ NEW IMPORTS: Due Collections
+import CompanyDueCollection from './pages/pharmacy/masters/CompanyDueCollection'
+import OpIpDueCollection from './pages/pharmacy/masters/OpIpDueCollection'
+import InsuranceDueCollection from './pages/pharmacy/masters/InsuranceDueCollection'
+
+// ✅ NEW IMPORTS: Stock & Expenses
+import ItemStock from './pages/pharmacy/masters/ItemStock'
+import PharmacyExpenses from './pages/pharmacy/masters/PharmacyExpenses'
+import ExpenseCategory from './pages/pharmacy/masters/ExpenseCategory'
+import VendorCategory from './pages/pharmacy/masters/VendorCategory'
 
 function withLayout(el) {
   return <Layout>{el}</Layout>
@@ -86,16 +103,12 @@ const PLACEHOLDERS = [
 ]
 
 const PHARMACY_PLACEHOLDERS = [
-  // Inventory Type, Item Type, Manufacturer, and Purchase Order now have real routes below
   ['Tax Categories', '/pharmacy/masters/tax-categories'],
   ['Rack Master', '/pharmacy/masters/rack-master'],
   ['Item Master', '/pharmacy/masters/item-master'],
   ['Item Package Master', '/pharmacy/masters/item-package-master'],
   ['Drug Combination', '/pharmacy/masters/drug-combination'],
   ['Stock Returns', '/pharmacy/transaction/stock-returns'],
-  ['Inpatient Sales Returns', '/pharmacy/sales-returns/inpatient'],
-  ['Outpatient Sales Returns', '/pharmacy/sales-returns/outpatient'],
-  ['Duplicate Invoice', '/pharmacy/duplicate-invoice'],
   ['Total Dues', '/pharmacy/reports/total-dues'],
   ['Due Reported Sales', '/pharmacy/reports/due-reported-sales'],
   ['Sales Returns Report', '/pharmacy/reports/sales-returns'],
@@ -103,7 +116,6 @@ const PHARMACY_PLACEHOLDERS = [
   ['OP/IP Due Report', '/pharmacy/reports/op-ip-due'],
   ['Pharmacy Report', '/pharmacy/reports/pharmacy'],
   ['Sales Report', '/pharmacy/reports/sales'],
-  ['Due Collections', '/pharmacy/due-collections'],
   ['Stock', '/pharmacy/stock'],
   ['Expenses', '/pharmacy/expenses'],
 ]
@@ -249,7 +261,7 @@ export default function App() {
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyDashboard />)}</ProtectedRoute>
         } />
 
-        {/* Real master pages (must come BEFORE placeholders so they win the match) */}
+        {/* Real master pages */}
         <Route path="/pharmacy/masters/inventory-type" element={
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InventoryType />)}</ProtectedRoute>
         } />
@@ -283,16 +295,55 @@ export default function App() {
 
         {/* Pharmacy sales pages */}
         <Route path="/pharmacy/sales/inpatient" element={
-          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InpatientSales />)}</ProtectedRoute>
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyIPSales />)}</ProtectedRoute>
         } />
         <Route path="/pharmacy/sales/outpatient" element={
-          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OutpatientSales />)}</ProtectedRoute>
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyOPSales />)}</ProtectedRoute>
         } />
+        
         <Route path="/pharmacy/sales/patient-indents" element={
-          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PatientIndents />)}</ProtectedRoute>
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyPatientIndents />)}</ProtectedRoute>
         } />
+        
         <Route path="/pharmacy/sales/ot-indents" element={
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OTIndents />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/duplicate-invoice" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<DuplicateInvoice />)}</ProtectedRoute>
+        } />
+
+        {/* ---> Pharmacy Sales Returns Routes <--- */}
+        <Route path="/pharmacy/sales-returns/inpatient" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InpatientSalesReturns />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/sales-returns/outpatient" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OutpatientSalesReturns />)}</ProtectedRoute>
+        } />
+
+        {/* ✅ NEW: Due Collections Routes */}
+        <Route path="/pharmacy/due-collections/company" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<CompanyDueCollection />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/due-collections/op-ip" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OpIpDueCollection />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/due-collections/insurance" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InsuranceDueCollection />)}</ProtectedRoute>
+        } />
+
+        {/* ✅ NEW: Stock & Expenses Routes */}
+        <Route path="/pharmacy/stock/item-stock" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ItemStock />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/expenses/pharmacy-expenses" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyExpenses />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/expenses/category" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ExpenseCategory />)}</ProtectedRoute>
+        } />
+        <Route path="/pharmacy/expenses/vendor-category" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<VendorCategory />)}</ProtectedRoute>
         } />
 
         {/* Super Admin Masters */}
@@ -329,6 +380,13 @@ export default function App() {
         <Route path="/superadmin/bulk-import" element={
           <ProtectedRoute roles={['super_admin']}>{withLayout(<BulkImport />)}</ProtectedRoute>
         } />
+
+        {/* Super Admin Placeholders */}
+        {MASTER_PLACEHOLDERS.map(([label, path]) => (
+          <Route key={path} path={path} element={
+            <ProtectedRoute roles={['super_admin']}>{withLayout(<ComingSoon title={label} />)}</ProtectedRoute>
+          } />
+        ))}
 
         {/* Executive placeholders */}
         {PLACEHOLDERS.map(([label, path]) => (

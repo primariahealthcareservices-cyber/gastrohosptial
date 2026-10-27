@@ -7,7 +7,6 @@ auth_bp = Blueprint("auth", __name__)
 
 ALLOWED_ROLES = ["super_admin", "admin", "executive", "pharmacy", "doctor", "lab_technician"]
 
-
 @auth_bp.route("/register", methods=["POST"])
 def register():
     data = request.get_json(silent=True) or {}
@@ -32,7 +31,6 @@ def register():
     )
     return jsonify({"message": "User registered", "id": user_id}), 201
 
-
 @auth_bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json(silent=True) or {}
@@ -42,6 +40,7 @@ def login():
     if not email or not password:
         return jsonify({"error": "email and password are required"}), 400
 
+    # Assuming your db.py uses dictionary cursors
     user = query("SELECT * FROM users WHERE email=%s AND is_active=1", (email,))
 
     if not user:
@@ -54,15 +53,24 @@ def login():
         identity=str(user["id"]),
         additional_claims={"role": user["role"], "name": user["name"], "email": user["email"]}
     )
+    
     return jsonify({
         "access_token": token,
-        "user": {"id": user["id"], "name": user["name"], "email": user["email"], "role": user["role"]}
-    })
-
+        "user": {
+            "id": user["id"], 
+            "name": user["name"], 
+            "email": user["email"], 
+            "role": user["role"]
+        }
+    }), 200
 
 @auth_bp.route("/me", methods=["GET"])
 @jwt_required()
 def me():
     claims = get_jwt()
-    return jsonify({"id": get_jwt_identity(), "name": claims.get("name"),
-                     "email": claims.get("email"), "role": claims.get("role")})
+    return jsonify({
+        "id": get_jwt_identity(), 
+        "name": claims.get("name"),
+        "email": claims.get("email"), 
+        "role": claims.get("role")
+    })

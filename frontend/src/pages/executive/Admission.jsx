@@ -10,6 +10,13 @@ export default function Admission() {
   const [wards, setWards] = useState([])
   const [rooms, setRooms] = useState([])
   const [beds, setBeds] = useState([])
+  
+  // --- NEW STATE FOR INVOICES ---
+  const [ipDetails, setIpDetails] = useState(null)
+  const [invoices, setInvoices] = useState([])
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
+  // ------------------------------
+
   const [form, setForm] = useState({
     ward_id: '', room_id: '', bed_id: '', admission_date: new Date().toISOString().slice(0, 10),
     admission_time: '10:00', reason: '', diagnosis: '', advance_amount: 0,
@@ -28,7 +35,9 @@ export default function Admission() {
   useEffect(() => {
     if (patientSearch.length > 1) {
       api.get('/patients', { params: { search: patientSearch } }).then((r) => setPatients(r.data))
-    } else setPatients([])
+    } else {
+      setPatients([])
+    }
   }, [patientSearch])
 
   useEffect(() => {
@@ -45,6 +54,49 @@ export default function Admission() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }))
 
+  // --- NEW FUNCTION TO FETCH IP DETAILS & INVOICES ---
+  const fetchPatientInvoices = async (patientUid) => {
+    setLoadingInvoices(true)
+    setInvoices([])
+    setIpDetails(null)
+    
+    try {
+      // 1. Find the IP Registration record for this patient
+      const ipRes = await api.get('/ip-registrations', { params: { search: patientUid } })
+      
+      // Check if they have an active IP registration
+      const activeIp = ipRes.data.find(ip => ip.status === 'Admitted')
+      
+      if (activeIp) {
+        setIpDetails(activeIp)
+        
+        // 2. Fetch Pharmacy Sales for this IP Registration
+        const invoiceRes = await api.get('/pharmacy-sales', {
+          params: { search: activeIp.ip_reg_no, sale_type: 'IP' }
+        })
+        setInvoices(invoiceRes.data)
+      } else {
+        setError("No active IP Admission found for this patient. Please register them as IP first.")
+      }
+    } catch (err) {
+      console.error("Error fetching invoices:", err)
+      setError("Could not fetch invoice details.")
+    } finally {
+      setLoadingInvoices(false)
+    }
+  }
+
+  // --- UPDATE PATIENT SELECTION ---
+  const handleSelectPatient = (p) => {
+    setPatientId(p.id)
+    setPatientSearch(`${p.name} (${p.patient_uid})`)
+    setPatients([])
+    setError('')
+    
+    // Trigger the fetch for invoices
+    fetchPatientInvoices(p.patient_uid) 
+  }
+
   const submit = async (e) => {
     e.preventDefault()
     if (!patientId) return setError('Select a patient first')
@@ -54,6 +106,8 @@ export default function Admission() {
       await api.post('/admissions', { patient_id: patientId, ...form })
       setPatientId(''); setPatientSearch('')
       setForm((f) => ({ ...f, ward_id: '', room_id: '', bed_id: '', reason: '', diagnosis: '', advance_amount: 0 }))
+      setIpDetails(null)
+      setInvoices([])
       loadAdmissions()
     } catch (err) {
       setError(err.response?.data?.error || 'Could not admit patient')
@@ -86,7 +140,7 @@ export default function Admission() {
               <div className="border border-border rounded-sm mb-3 max-h-40 overflow-y-auto">
                 {patients.map((p) => (
                   <button type="button" key={p.id}
-                    onClick={() => { setPatientId(p.id); setPatientSearch(`${p.name} (${p.patient_uid})`); setPatients([]) }}
+                    onClick={() => handleSelectPatient(p)}
                     className="w-full text-left px-3 py-2 text-sm hover:bg-teal-50 border-b border-border last:border-0">
                     {p.name} · {p.phone}
                   </button>
@@ -143,7 +197,71 @@ export default function Admission() {
           </Section>
         </form>
 
-        <div className="xl:col-span-2">
+        <div className="xl:col-span-2 space-y-5">
+          
+          {/* --- NEW SECTION: PATIENT DETAILS & INVOICES --- */}
+          {ipDetails && (
+            <Section title="Patient Details & Pharmacy Invoices">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div>
+                  <label className="label text-xs text-gray-500">Registration#</label>
+                  <div className="font-semibold">{ipDetails.ip_reg_no}</div>
+                </div>
+                <div>
+                  <label className="label text-xs text-gray-500">Name</label>
+                  <div className="font-semibold">{ipDetails.first_name} {ipDetails.last_name}</div>
+                </div>
+                <div>
+                  <label className="label text-xs text-gray-500">Mobile#</label>
+                  <div className="font-semibold">{ipDetails.mobile}</div>
+                </div>
+                <div>
+                  <label className="label text-xs text-gray-500">Gender/Age</label>
+                  <div className="font-semibold">{ipDetails.gender} / {ipDetails.age}Y</div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label text-xs text-gray-500">Doctor</label>
+                  <div className="font-semibold">{ipDetails.doctor_name || 'N/A'}</div>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="label text-xs text-gray-500">Room / Bed</label>
+                  <div className="font-semibold">{ipDetails.room_type} / {ipDetails.room_no} / {ipDetails.bed_no}</div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto mt-4 border-t pt-4">
+                <h4 className="text-sm font-semibold mb-2 text-gray-700">Pharmacy Invoices</h4>
+                <table className="w-full text-left text-sm border">
+                  <thead className="bg-[#2c8bbb] text-white">
+                    <tr>
+                      <th className="px-4 py-2 font-medium">Invoice No</th>
+                      <th className="px-4 py-2 font-medium">Date</th>
+                      <th className="px-4 py-2 font-medium">Amount</th>
+                      <th className="px-4 py-2 font-medium">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingInvoices ? (
+                      <tr><td colSpan="4" className="text-center py-4">Loading invoices...</td></tr>
+                    ) : invoices.length > 0 ? (
+                      invoices.map((inv) => (
+                        <tr key={inv.id} className="border-b">
+                          <td className="px-4 py-2">{inv.sale_no}</td>
+                          <td className="px-4 py-2">{new Date(inv.created_at).toLocaleDateString()}</td>
+                          <td className="px-4 py-2">₹{inv.net_amount}</td>
+                          <td className="px-4 py-2">{inv.status}</td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr><td colSpan="4" className="text-center py-4 text-gray-500">No pharmacy invoices found for this patient.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Section>
+          )}
+          {/* ------------------------------------------------ */}
+
           <Section title="Admissions">
             <div className="overflow-x-auto">
               <table className="table-base">

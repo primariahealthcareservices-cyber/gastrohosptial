@@ -34,10 +34,10 @@ def get_op_lab_reports():
     patient_id = request.args.get("patient_id")
     status = request.args.get("status")
 
+    # ✅ REMOVED lr.lab_test_id FROM SELECT
     sql = """
         SELECT lr.id, lr.op_registration_id, lr.patient_id,
                lr.test_name, lr.result, lr.normal_range, lr.unit,
-               lr.lab_test_id,
                lr.status, lr.report_date, lr.created_at, lr.updated_at,
                p.name AS patient_name, p.patient_uid AS mr_number,
                r.opd_reg_no,
@@ -87,10 +87,10 @@ def get_ip_lab_reports():
     patient_id = request.args.get("patient_id")
     status = request.args.get("status")
 
+    # ✅ REMOVED lr.lab_test_id FROM SELECT
     sql = """
         SELECT lr.id, lr.ip_registration_id, lr.patient_id,
                lr.test_name, lr.result, lr.normal_range, lr.unit,
-               lr.lab_test_id,
                lr.status, lr.report_date, lr.created_at, lr.updated_at,
                p.name AS patient_name, p.patient_uid AS mr_number,
                r.ip_reg_no,
@@ -185,9 +185,11 @@ def get_report_detail(report_id):
     rf = _reg_fk(kind)
 
     # ---------------- HEADER ----------------
+    # Note: We don't have lab_test_id in the table anymore, so we check it via JOIN if needed, 
+    # or we just rely on test_name to fetch attributes.
     header = query(f"""
         SELECT lr.id, lr.{rf} AS registration_id, lr.patient_id,
-               lr.test_name, lr.lab_test_id, lr.status, lr.report_date,
+               lr.test_name, lr.status, lr.report_date,
                p.name AS patient_name, p.patient_uid AS mr_number,
                r.{rc} AS reg_no
         FROM {rt} lr
@@ -209,8 +211,10 @@ def get_report_detail(report_id):
     """, (report_id,), many=True)
 
     # ---------------- RESOLVE TEST ID ----------------
-    test_id = header.get("lab_test_id")
-    if not test_id and header.get("test_name"):
+    # Since lab_test_id is removed from op_lab_results/ip_lab_results, 
+    # we look it up by test_name in the lab_tests master table.
+    test_id = None
+    if header.get("test_name"):
         row = query(
             "SELECT id FROM lab_tests "
             "WHERE LOWER(TRIM(test_name))=LOWER(TRIM(%s))",
@@ -220,7 +224,6 @@ def get_report_detail(report_id):
             test_id = row["id"]
 
     # ---------------- MASTER ATTRIBUTES ----------------
-    # lab_test_attributes is standalone. Attributes live there directly.
     master_attrs = []
     if test_id:
         master_attrs = query("""

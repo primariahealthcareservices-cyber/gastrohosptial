@@ -59,9 +59,31 @@ const NAV_TREE = [
       { label: 'Sales Report', to: '/pharmacy/reports/sales' },
     ],
   },
-  { type: 'link', label: 'Due Collections', to: '/pharmacy/due-collections', icon: Wallet },
-  { type: 'link', label: 'Stock', to: '/pharmacy/stock', icon: Package },
-  { type: 'link', label: 'Expenses', to: '/pharmacy/expenses', icon: Receipt },
+  // ✅ Due Collections Dropdown
+  {
+    type: 'group', key: 'due-collections', label: 'Due Collections', icon: Wallet,
+    children: [
+      { label: 'Company Due Collection', to: '/pharmacy/due-collections/company' },
+      { label: 'IP / OP Due Collection', to: '/pharmacy/due-collections/op-ip' },
+      { label: 'Insurance Due Collection', to: '/pharmacy/due-collections/insurance' },
+    ],
+  },
+  // ✅ Stock Dropdown (Updated to only show Item Stock)
+  {
+    type: 'group', key: 'stock', label: 'Stock', icon: Package,
+    children: [
+      { label: 'Item Stock', to: '/pharmacy/stock/item-stock' },
+    ],
+  },
+  // ✅ Expenses Dropdown
+  {
+    type: 'group', key: 'expenses', label: 'Expenses', icon: Receipt,
+    children: [
+      { label: 'Pharmacy Expenses', to: '/pharmacy/expenses/pharmacy-expenses' },
+      { label: 'Expense Category', to: '/pharmacy/expenses/category' },
+      { label: 'Vendor Category', to: '/pharmacy/expenses/vendor-category' },
+    ],
+  },
 ]
 
 function flattenLinks(node) {

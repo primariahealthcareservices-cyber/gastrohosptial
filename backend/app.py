@@ -1,7 +1,7 @@
 import os
 import traceback
 from datetime import timedelta
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
@@ -27,7 +27,6 @@ from routes.direct_services import direct_services_bp
 from routes.catalog import catalog_bp
 from routes.pharmacy_items import pharmacy_items_bp
 from routes.pharmacy_sales import pharmacy_sales_bp
-from routes.patient_indents import patient_indents_bp
 from routes.ot_indents import ot_indents_bp
 from routes.advance_payments import advance_payments_bp
 from routes.ip_lab import ip_lab_bp
@@ -49,18 +48,40 @@ from routes.pharmacy_inventory_types import pharmacy_inventory_types_bp
 from routes.pharmacy_item_types import pharmacy_item_types_bp
 from routes.manufacturers import manufacturers_bp
 from routes.purchase_orders import purchase_orders_bp
-DEBUG = os.getenv("FLASK_ENV", "development") == "development"
+from routes.pharmacy_patient_indents import pharmacy_patient_indents_bp
+from routes.pharmacy_duplicate_invoice import pharmacy_duplicate_invoice_bp
+from routes.pharmacy_ip_sales import pharmacy_ip_sales_bp
+from routes.pharmacy_op_sales import pharmacy_op_sales_bp
 
+# ✅ NEW IMPORTS: Due Collections
+from routes.company_due_collection import company_due_collection_bp
+from routes.op_ip_due_collection import op_ip_due_collection_bp
+from routes.insurance_due_collection import insurance_due_collection_bp
+
+# ✅ NEW IMPORTS: Stock & Expenses
+from routes.item_stock import item_stock_bp
+from routes.pharmacy_expenses import pharmacy_expenses_bp
+from routes.expense_category import expense_category_bp
+from routes.vendor_category import vendor_category_bp
+
+DEBUG = os.getenv("FLASK_ENV", "development") == "development"
 
 def create_app():
     app = Flask(__name__)
-    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024   # 50 MB
+    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
     app.config["JWT_SECRET_KEY"] = Config.JWT_SECRET_KEY
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
     app.config["DEBUG"] = DEBUG
-    CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+    CORS(app, resources={r"/api/*": {
+        "origins": "*",
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }})
+    
     JWTManager(app)
 
+    # Existing Routes
     app.register_blueprint(auth_bp, url_prefix="/api/auth")
     app.register_blueprint(patients_bp, url_prefix="/api/patients")
     app.register_blueprint(appointments_bp, url_prefix="/api/appointments")
@@ -84,7 +105,7 @@ def create_app():
     app.register_blueprint(pharmacy_items_bp, url_prefix="/api/pharmacy-items")
     app.register_blueprint(catalog_bp, url_prefix="/api/catalog")
     app.register_blueprint(pharmacy_sales_bp, url_prefix="/api/pharmacy-sales")
-    app.register_blueprint(patient_indents_bp, url_prefix="/api/patient-indents")
+    app.register_blueprint(pharmacy_patient_indents_bp, url_prefix="/api/pharmacy-patient-indents")
     app.register_blueprint(ot_indents_bp, url_prefix="/api/ot-indents")
     app.register_blueprint(advance_payments_bp, url_prefix="/api/advance-payments")
     app.register_blueprint(ip_lab_bp, url_prefix="/api/ip-lab")
@@ -105,6 +126,22 @@ def create_app():
     app.register_blueprint(lab_attributes_bp, url_prefix="/api")
     app.register_blueprint(bulk_import_bp, url_prefix="/api/superadmin")
 
+    # Pharmacy Sales
+    app.register_blueprint(pharmacy_ip_sales_bp, url_prefix="/api/pharmacy-ip-sales")
+    app.register_blueprint(pharmacy_op_sales_bp, url_prefix="/api/pharmacy-op-sales")
+    app.register_blueprint(pharmacy_duplicate_invoice_bp, url_prefix="/api/pharmacy-duplicate-invoice")
+    
+    # Due Collections
+    app.register_blueprint(company_due_collection_bp, url_prefix="/api/company-due-collection")
+    app.register_blueprint(op_ip_due_collection_bp, url_prefix="/api/op-ip-due-collection")
+    app.register_blueprint(insurance_due_collection_bp, url_prefix="/api/insurance-due-collection")
+
+    # ✅ NEW: Stock & Expenses Registered
+    app.register_blueprint(item_stock_bp, url_prefix="/api/item-stock")
+    app.register_blueprint(pharmacy_expenses_bp, url_prefix="/api/pharmacy-expenses")
+    app.register_blueprint(expense_category_bp, url_prefix="/api/expense-category")
+    app.register_blueprint(vendor_category_bp, url_prefix="/api/vendor-category")
+
     @app.route("/api/health")
     def health():
         return jsonify({"status": "ok"})
@@ -120,7 +157,6 @@ def create_app():
         return jsonify({"error": "Internal server error", "detail": str(original)}), 500
 
     return app
-
 
 app = create_app()
 
