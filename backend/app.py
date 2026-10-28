@@ -49,6 +49,7 @@ from routes.pharmacy_inventory_types import pharmacy_inventory_types_bp
 from routes.pharmacy_item_types import pharmacy_item_types_bp
 from routes.manufacturers import manufacturers_bp
 from routes.purchase_orders import purchase_orders_bp
+from routes.item_stock import item_stock_bp
 DEBUG = os.getenv("FLASK_ENV", "development") == "development"
 
 
@@ -104,6 +105,7 @@ def create_app():
     app.register_blueprint(lab_tests_bp, url_prefix="/api/lab-tests")
     app.register_blueprint(lab_attributes_bp, url_prefix="/api")
     app.register_blueprint(bulk_import_bp, url_prefix="/api/superadmin")
+    app.register_blueprint(item_stock_bp, url_prefix="/api/item-stock")
 
     @app.route("/api/health")
     def health():

@@ -18,9 +18,6 @@ function SectionHeading({ children, rightContent }) {
   )
 }
 
-// ============================================================
-// Autocomplete for Item Name
-// ============================================================
 function ItemNameAutocomplete({ value, onChange, options, onInvalid, style }) {
   const [open, setOpen] = useState(false)
   const [highlight, setHighlight] = useState(0)
@@ -364,9 +361,6 @@ export default function PurchaseOrder() {
   )
 }
 
-// ============================================================
-// PO Add/Edit Modal — Inventory Type now populated from API
-// ============================================================
 function POFormModal({ poId, onClose }) {
   const emptyItem = {
     item_name: '', pack: '', qty: 0, free_qty: 0,
@@ -388,7 +382,7 @@ function POFormModal({ poId, onClose }) {
   })
   const [items, setItems] = useState([{ ...emptyItem }])
   const [suppliers, setSuppliers] = useState([])
-  const [inventoryTypes, setInventoryTypes] = useState([])   // ← NEW
+  const [inventoryTypes, setInventoryTypes] = useState([]) 
   const [itemNames, setItemNames] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -402,7 +396,6 @@ function POFormModal({ poId, onClose }) {
       .then((res) => setSuppliers(Array.isArray(res) ? res : (res?.data ?? [])))
       .catch(() => setSuppliers([]))
 
-    // ← Load inventory types from the master
     inventoryTypeApi.getAllActive()
       .then((d) => setInventoryTypes(Array.isArray(d) ? d : []))
       .catch(() => setInventoryTypes([]))
@@ -412,7 +405,7 @@ function POFormModal({ poId, onClose }) {
         const list = Array.isArray(d) ? d : []
         setItemNames(list)
         if (list.length === 0) {
-          console.warn('[PO] No items returned from /items-master/all-names (or /pharmacy-items/all-names)')
+          console.warn('[PO] No items returned from /item-stock/all-names')
         }
       })
       .catch((err) => {
@@ -498,7 +491,7 @@ function POFormModal({ poId, onClose }) {
   const recalcTotals = (list, overrides = {}) => {
     const st = list.reduce((sum, it) => sum + Number(it.amount || 0), 0)
     const discPct = Number(overrides.overall_disc_pct ?? form.overall_disc_pct) || 0
-    const discAmt = (st * discPct) / 100
+    const discAmt = (st * discPct) / 100    
     const tax = list.reduce((sum, it) => sum + Number(it.tax_amt || 0), 0)
     const net = st - discAmt + tax
     const other = Number(overrides.other_charges ?? form.other_charges) || 0
@@ -544,17 +537,25 @@ function POFormModal({ poId, onClose }) {
   const handleItemNameChange = (idx, name, match) => {
     const copy = [...items]
     copy[idx] = { ...copy[idx], item_name: name }
+    
     if (match) {
+      copy[idx].pack = match.pack || copy[idx].pack
       copy[idx].mrp = match.mrp || copy[idx].mrp
-      if (match.new_tax_percent != null) copy[idx].tax_pct = match.new_tax_percent
+      copy[idx].rate = match.rate || copy[idx].rate
+      if (match.new_tax_percent != null) {
+        copy[idx].tax_pct = match.new_tax_percent
+      } else if (match.old_tax_percent != null) {
+        copy[idx].tax_pct = match.old_tax_percent
+      }
     }
+    
     copy[idx] = recomputeRow(copy[idx])
     setItems(copy)
     recalcTotals(copy)
   }
 
   const handleInvalidItemName = (name) => {
-    setPopup({ message: `Please enter item name correctly.\n"${name}" is not in the item master.` })
+    setPopup({ message: `Please enter item name correctly.\n"${name}" is not in the stock list.` })
   }
 
   const addItem = () => {
@@ -590,7 +591,7 @@ function POFormModal({ poId, onClose }) {
         (o) => o.name.toLowerCase() === it.item_name.trim().toLowerCase()
       )
       if (!ok) {
-        setPopup({ message: `Please enter item name correctly.\nRow ${i + 1}: "${it.item_name}" is not in the item master.` })
+        setPopup({ message: `Please enter item name correctly.\nRow ${i + 1}: "${it.item_name}" is not in the stock list.` })
         return
       }
     }
@@ -965,9 +966,6 @@ function POFormModal({ poId, onClose }) {
   )
 }
 
-// ============================================================
-// Add New Item Modal
-// ============================================================
 function AddNewItemModal({ onClose, onSave }) {
   const [form, setForm] = useState({
     name: '', inventory_type: '', manufacturer: '',
@@ -1152,9 +1150,6 @@ function AddNewItemModal({ onClose, onSave }) {
   )
 }
 
-// ============================================================
-// New Pack Modal
-// ============================================================
 function NewPackModal({ onClose }) {
   const [form, setForm] = useState({ pack_name: '', pack_qty: '' })
 

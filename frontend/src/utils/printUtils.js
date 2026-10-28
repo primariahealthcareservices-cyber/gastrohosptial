@@ -12,11 +12,9 @@ export function printPatientRegistration(data, type = 'OP') {
     title, first_name, last_name, gender, age, dob, mobile, alt_phone,
     email, aadhar_number, address, village, mandal, district, state, pincode,
     guardian_name, guardian_relation, guardian_mobile, occupation, blood_group,
-    // OP specific
     visit_type, referral_type, referral_doctor_name, doctor_name,
     consultation_fee, registration_fee, appointment_date, appointment_time,
     payment_mode, mlc, booking_type,
-    // IP specific
     admitted_date, floor, room_type, room_no, bed_no, symptoms,
     advance_amount, marital_status, mother_name, locality,
   } = data;
@@ -35,97 +33,140 @@ export function printPatientRegistration(data, type = 'OP') {
     <head>
       <title>${type} Registration - ${fullName}</title>
       <style>
-        body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-        .header { text-align: center; border-bottom: 2px solid #2c3e50; padding-bottom: 15px; margin-bottom: 20px; }
-        .hospital-name { font-size: 24px; font-weight: bold; color: #2c3e50; }
-        .hospital-address { font-size: 13px; color: #666; margin-top: 5px; }
-        .title { font-size: 20px; font-weight: bold; text-align: center; margin: 20px 0; }
-        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-        td { padding: 8px 10px; border: 1px solid #ddd; vertical-align: top; }
-        .label { font-weight: bold; background: #f5f5f5; width: 30%; }
-        .section-title { font-weight: bold; font-size: 16px; margin: 15px 0 10px 0; background: #2c3e50; color: white; padding: 5px 10px; }
-        .footer { text-align: center; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 15px; font-size: 12px; color: #888; }
-        @media print { body { padding: 20px; } }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; padding: 30px; color: #333; line-height: 1.5; background: #fff; }
+
+        /* ---- Header: logo left, address right ---- */
+        .header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 20px;
+          border-bottom: 2px solid #2c3e50;
+          padding-bottom: 12px;
+          margin-bottom: 18px;
+        }
+        .header-left {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+        }
+        .logo {
+          max-width: 180px;
+          max-height: 160px;
+          object-fit: contain;
+        }
+        .header-right {
+          flex: 1;
+          text-align: right;
+        }
+        .hospital-name { font-size: 22px; font-weight: bold; color: #2c3e50; letter-spacing: 1px; }
+        .hospital-address { font-size: 12.5px; color: #666; margin-top: 3px; }
+        .hospital-phone { font-size: 12.5px; color: #666; }
+
+        .title { font-size: 20px; font-weight: bold; text-align: center; margin: 18px 0; text-transform: uppercase; letter-spacing: 1.5px; color: #1a2a3a; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        td { padding: 7px 10px; border: 1px solid #ddd; vertical-align: top; font-size: 13px; }
+        .label { font-weight: bold; background: #f5f5f5; width: 22%; }
+        .section-title { font-weight: bold; font-size: 15px; margin: 16px 0 8px 0; background: #2c3e50; color: white; padding: 6px 10px; border-radius: 2px; }
+
+        /* ---- Bottom alignment ---- */
+        .footer-wrap {
+          margin-top: 40px;
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-end;
+          padding-top: 12px;
+        }
+        .signature-box { text-align: center; font-size: 12px; color: #555; }
+        .signature-line { border-top: 1px solid #333; width: 180px; margin-bottom: 4px; padding-top: 4px; }
+        .footer-note {
+          text-align: center;
+          margin-top: 20px;
+          border-top: 1px solid #ddd;
+          padding-top: 10px;
+          font-size: 11px;
+          color: #888;
+        }
+
+        @media print { body { padding: 15px; } }
       </style>
     </head>
     <body>
       <div class="header">
-        <div class="hospital-name">${hospitalName}</div>
-        <div class="hospital-address">${hospitalAddress}</div>
-        <div class="hospital-address">${hospitalPhone}</div>
+        <div class="header-left">
+          <img src="/sgr.jpeg" alt="Hospital Logo" class="logo" onerror="this.style.display='none'" />
+        </div>
+        <div class="header-right">
+          <div class="hospital-name">${hospitalName}</div>
+          <div class="hospital-address">${hospitalAddress}</div>
+          <div class="hospital-phone">${hospitalPhone}</div>
+        </div>
       </div>
 
       <div class="title">${type} PATIENT REGISTRATION</div>
 
       <table>
-        <tr><td class="label">Patient Name</td><td>${fullName}</td></tr>
-        <tr><td class="label">Gender / Age</td><td>${gender || '—'} / ${age || '—'}Y</td></tr>
-        <tr><td class="label">Date of Birth</td><td>${dob || '—'}</td></tr>
-        <tr><td class="label">Mobile</td><td>${mobile || '—'}</td></tr>
-        <tr><td class="label">Alternate Phone</td><td>${alt_phone || '—'}</td></tr>
-        <tr><td class="label">Email</td><td>${email || '—'}</td></tr>
-        <tr><td class="label">Aadhar Number</td><td>${aadhar_number || '—'}</td></tr>
-        <tr><td class="label">Occupation</td><td>${occupation || '—'}</td></tr>
-        <tr><td class="label">Blood Group</td><td>${blood_group || '—'}</td></tr>
-        <tr><td class="label">Marital Status</td><td>${marital_status || '—'}</td></tr>
+        <tr><td class="label">Patient Name</td><td>${fullName}</td><td class="label">Gender / Age</td><td>${gender || '—'} / ${age || '—'}Y</td></tr>
+        <tr><td class="label">Date of Birth</td><td>${dob || '—'}</td><td class="label">Marital Status</td><td>${marital_status || '—'}</td></tr>
+        <tr><td class="label">Mobile</td><td>${mobile || '—'}</td><td class="label">Alternate Phone</td><td>${alt_phone || '—'}</td></tr>
+        <tr><td class="label">Email</td><td>${email || '—'}</td><td class="label">Aadhar Number</td><td>${aadhar_number || '—'}</td></tr>
+        <tr><td class="label">Occupation</td><td>${occupation || '—'}</td><td class="label">Blood Group</td><td>${blood_group || '—'}</td></tr>
       </table>
 
       <div class="section-title">Address</div>
       <table>
-        <tr><td class="label">Address</td><td>${address || '—'}</td></tr>
-        <tr><td class="label">Village</td><td>${village || '—'}</td></tr>
-        <tr><td class="label">Mandal</td><td>${mandal || '—'}</td></tr>
-        <tr><td class="label">District</td><td>${district || '—'}</td></tr>
-        <tr><td class="label">State</td><td>${state || '—'}</td></tr>
-        <tr><td class="label">Pincode</td><td>${pincode || '—'}</td></tr>
-        <tr><td class="label">Locality</td><td>${locality || '—'}</td></tr>
+        <tr><td class="label">Address</td><td colspan="3">${address || '—'}</td></tr>
+        <tr><td class="label">Village</td><td>${village || '—'}</td><td class="label">Mandal</td><td>${mandal || '—'}</td></tr>
+        <tr><td class="label">District</td><td>${district || '—'}</td><td class="label">State</td><td>${state || '—'}</td></tr>
+        <tr><td class="label">Pincode</td><td>${pincode || '—'}</td><td class="label">Locality</td><td>${locality || '—'}</td></tr>
       </table>
 
       ${guardian_name ? `
         <div class="section-title">Guardian Details</div>
         <table>
-          <tr><td class="label">Guardian Name</td><td>${guardian_name}</td></tr>
-          <tr><td class="label">Relationship</td><td>${guardian_relation || '—'}</td></tr>
-          <tr><td class="label">Guardian Mobile</td><td>${guardian_mobile || '—'}</td></tr>
-          ${mother_name ? `<tr><td class="label">Mother Name</td><td>${mother_name}</td></tr>` : ''}
+          <tr><td class="label">Guardian Name</td><td>${guardian_name}</td><td class="label">Relationship</td><td>${guardian_relation || '—'}</td></tr>
+          <tr><td class="label">Guardian Mobile</td><td>${guardian_mobile || '—'}</td><td class="label">Mother Name</td><td>${mother_name || '—'}</td></tr>
         </table>
       ` : ''}
 
       ${type === 'OP' ? `
         <div class="section-title">Consultation Details</div>
         <table>
-          <tr><td class="label">Visit Type</td><td>${visit_type || 'General'}</td></tr>
-          <tr><td class="label">Doctor</td><td>${doctor_name || '—'}</td></tr>
-          <tr><td class="label">Consultation Fee</td><td>₹${consultation_fee || 0}</td></tr>
-          <tr><td class="label">Registration Fee</td><td>₹${registration_fee || 0}</td></tr>
-          <tr><td class="label">Referral Type</td><td>${referral_type || 'Walkin'}</td></tr>
-          ${referral_doctor_name ? `<tr><td class="label">Referring Doctor</td><td>${referral_doctor_name}</td></tr>` : ''}
-          <tr><td class="label">Appointment Date</td><td>${appointment_date || '—'}</td></tr>
-          <tr><td class="label">Appointment Time</td><td>${appointment_time || '—'}</td></tr>
-          <tr><td class="label">Payment Mode</td><td>${payment_mode || 'Cash'}</td></tr>
-          <tr><td class="label">Booking Type</td><td>${booking_type || 'Walk-in'}</td></tr>
-          <tr><td class="label">MLC</td><td>${mlc ? 'Yes' : 'No'}</td></tr>
+          <tr><td class="label">Visit Type</td><td>${visit_type || 'General'}</td><td class="label">Doctor</td><td>${doctor_name || '—'}</td></tr>
+          <tr><td class="label">Consultation Fee</td><td>₹${consultation_fee || 0}</td><td class="label">Registration Fee</td><td>₹${registration_fee || 0}</td></tr>
+          <tr><td class="label">Referral Type</td><td>${referral_type || 'Walkin'}</td><td class="label">Referring Doctor</td><td>${referral_doctor_name || '—'}</td></tr>
+          <tr><td class="label">Appointment Date</td><td>${appointment_date || '—'}</td><td class="label">Appointment Time</td><td>${appointment_time || '—'}</td></tr>
+          <tr><td class="label">Payment Mode</td><td>${payment_mode || 'Cash'}</td><td class="label">Booking Type</td><td>${booking_type || 'Walk-in'}</td></tr>
+          <tr><td class="label">MLC</td><td colspan="3">${mlc ? 'Yes' : 'No'}</td></tr>
         </table>
       ` : ''}
 
       ${type === 'IP' ? `
         <div class="section-title">Admission Details</div>
         <table>
-          <tr><td class="label">Admitted Date</td><td>${admitted_date || '—'}</td></tr>
-          <tr><td class="label">Floor</td><td>${floor || '—'}</td></tr>
-          <tr><td class="label">Room Type</td><td>${room_type || 'General'}</td></tr>
-          <tr><td class="label">Room No</td><td>${room_no || '—'}</td></tr>
-          <tr><td class="label">Bed No</td><td>${bed_no || '—'}</td></tr>
-          <tr><td class="label">Symptoms</td><td>${symptoms || '—'}</td></tr>
-          <tr><td class="label">Referral Type</td><td>${referral_type || 'Walkin'}</td></tr>
-          ${referral_doctor_name ? `<tr><td class="label">Referring Doctor</td><td>${referral_doctor_name}</td></tr>` : ''}
-          <tr><td class="label">Payment Mode</td><td>${payment_mode || 'Cash'}</td></tr>
-          <tr><td class="label">Advance Amount</td><td>₹${advance_amount || 0}</td></tr>
-          <tr><td class="label">Booking Type</td><td>${booking_type || 'Walk-in'}</td></tr>
+          <tr><td class="label">Admitted Date</td><td>${admitted_date || '—'}</td><td class="label">Consultant Doctor</td><td>${doctor_name || '—'}</td></tr>
+          <tr><td class="label">Floor</td><td>${floor || '—'}</td><td class="label">Room Type</td><td>${room_type || 'General'}</td></tr>
+          <tr><td class="label">Room No</td><td>${room_no || '—'}</td><td class="label">Bed No</td><td>${bed_no || '—'}</td></tr>
+          <tr><td class="label">Symptoms</td><td colspan="3">${symptoms || '—'}</td></tr>
+          <tr><td class="label">Referral Type</td><td>${referral_type || 'Walkin'}</td><td class="label">Referring Doctor</td><td>${referral_doctor_name || '—'}</td></tr>
+          <tr><td class="label">Payment Mode</td><td>${payment_mode || 'Cash'}</td><td class="label">Advance Amount</td><td>₹${advance_amount || 0}</td></tr>
+          <tr><td class="label">Booking Type</td><td colspan="3">${booking_type || 'Walk-in'}</td></tr>
         </table>
       ` : ''}
 
-      <div class="footer">
+      <div class="footer-wrap">
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          Patient / Guardian Signature
+        </div>
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          Authorized Signature
+        </div>
+      </div>
+
+      <div class="footer-note">
         This is a computer generated document. &copy; ${new Date().getFullYear()} ${hospitalName}
       </div>
     </body>

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
+import { Search, X } from 'lucide-react'
 import api from '../../api/axios'
 import { PageHeader, Section } from '../../components/PageHeader'
 import ItemLineTable, { emptyLine } from '../../components/pharmacy/ItemLineTable'
 
 export default function InpatientSales() {
-  const [regNo, setRegNo] = useState('')
   const [admission, setAdmission] = useState(null)
   const [stores, setStores] = useState([])
   const [storeId, setStoreId] = useState('')
@@ -17,6 +17,9 @@ export default function InpatientSales() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(null)
+  
+  // Modal State
+  const [showPatientModal, setShowPatientModal] = useState(false)
 
   useEffect(() => {
     api.get('/pharmacy-items/stores').then((r) => {
@@ -25,19 +28,6 @@ export default function InpatientSales() {
     })
   }, [])
 
-  const lookupPatient = async () => {
-    setError('')
-    if (!regNo.trim()) return
-    try {
-      const { data } = await api.get('/ip-registrations', { params: { search: regNo } })
-      const match = data.find((r) => r.ip_reg_no === regNo || r.mr_number === regNo) || data[0]
-      if (!match) return setError('No matching admitted patient found')
-      setAdmission(match)
-    } catch {
-      setError('Could not look up patient')
-    }
-  }
-
   const total = lines.reduce((s, l) => s + Number(l.qty || 0) * Number(l.mrp || 0), 0)
   const discountAmount = (total * Number(discountPercent || 0)) / 100
   const net = Math.max(0, total - discountAmount)
@@ -45,7 +35,7 @@ export default function InpatientSales() {
 
   const submit = async (asDraft) => {
     setError('')
-    if (!admission) return setError('Look up the patient registration first')
+    if (!admission) return setError('Select an admitted patient first')
     setSaving(true)
     try {
       const { data } = await api.post('/pharmacy-sales', {
@@ -85,15 +75,27 @@ export default function InpatientSales() {
           <div>
             <label className="label">Registration *</label>
             <div className="flex gap-1">
-              <input className="input" value={regNo} onChange={(e) => setRegNo(e.target.value)} placeholder="IP Reg No / MR" />
-              <button type="button" className="btn-secondary px-3" onClick={lookupPatient}>🔍</button>
+              <input 
+                className="input bg-gray-50 cursor-pointer" 
+                readOnly 
+                value={admission ? admission.ip_reg_no : ''} 
+                placeholder="Click Search to select patient" 
+                onClick={() => setShowPatientModal(true)}
+              />
+              <button 
+                type="button" 
+                className="btn-secondary px-3" 
+                onClick={() => setShowPatientModal(true)}
+              >
+                <Search size={16} />
+              </button>
             </div>
           </div>
-          <div><label className="label">Name</label><input className="input" readOnly value={admission?.name || ''} /></div>
-          <div><label className="label">Mobile#</label><input className="input" readOnly value={admission?.mobile || ''} /></div>
-          <div><label className="label">Age/Gender</label><input className="input" readOnly value={admission ? `${admission.age ?? '—'} / ${admission.gender}` : ''} /></div>
-          <div><label className="label">Doctor</label><input className="input" readOnly value={admission?.doctor_name || ''} /></div>
-          <div><label className="label">Floor/Room Type/Room No/Bed No</label><input className="input" readOnly value={admission ? `${admission.room_type || '—'}/${admission.room_no || '—'}/${admission.bed_no || '—'}` : ''} /></div>
+          <div><label className="label">Name</label><input className="input bg-gray-50" readOnly value={admission?.name || ''} /></div>
+          <div><label className="label">Mobile#</label><input className="input bg-gray-50" readOnly value={admission?.mobile || ''} /></div>
+          <div><label className="label">Age/Gender</label><input className="input bg-gray-50" readOnly value={admission ? `${admission.age ?? '—'} / ${admission.gender}` : ''} /></div>
+          <div><label className="label">Doctor</label><input className="input bg-gray-50" readOnly value={admission?.doctor_name || ''} /></div>
+          <div><label className="label">Floor/Room Type/Room No/Bed No</label><input className="input bg-gray-50" readOnly value={admission ? `${admission.room_type || '—'}/${admission.room_no || '—'}/${admission.bed_no || '—'}` : ''} /></div>
           <div>
             <label className="label">Select Pharmacy Store</label>
             <select className="input" value={storeId} onChange={(e) => setStoreId(e.target.value)}>
@@ -110,10 +112,10 @@ export default function InpatientSales() {
 
       <Section title="Payment Details">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div><label className="label">Total Amount(₹)</label><input className="input" readOnly value={total.toFixed(2)} /></div>
+          <div><label className="label">Total Amount(₹)</label><input className="input bg-gray-50" readOnly value={total.toFixed(2)} /></div>
           <div><label className="label">Discount(%)</label><input type="number" className="input" value={discountPercent} onChange={(e) => setDiscountPercent(e.target.value)} /></div>
-          <div><label className="label">Discount Amount</label><input className="input" readOnly value={discountAmount.toFixed(2)} /></div>
-          <div><label className="label">Net Amount(₹)</label><input className="input" readOnly value={net.toFixed(2)} /></div>
+          <div><label className="label">Discount Amount</label><input className="input bg-gray-50" readOnly value={discountAmount.toFixed(2)} /></div>
+          <div><label className="label">Net Amount(₹)</label><input className="input bg-gray-50" readOnly value={net.toFixed(2)} /></div>
           <div>
             <label className="label">Payment Mode *</label>
             <select className="input" value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
@@ -121,16 +123,121 @@ export default function InpatientSales() {
             </select>
           </div>
           <div><label className="label">Paid Amount *</label><input type="number" className="input" value={paid} onChange={(e) => setPaid(e.target.value)} /></div>
-          <div><label className="label">Due Amount *</label><input className="input" readOnly value={due.toFixed(2)} /></div>
+          <div><label className="label">Due Amount *</label><input className="input bg-gray-50" readOnly value={due.toFixed(2)} /></div>
           <div><label className="label">Remarks *</label><input className="input" value={remarks} onChange={(e) => setRemarks(e.target.value)} /></div>
         </div>
 
         <div className="flex gap-3 mt-4">
           <button type="button" className="btn-secondary" disabled={saving} onClick={() => submit(true)}>Save as Draft</button>
           <button type="button" className="btn-primary" disabled={saving} onClick={() => submit(false)}>{saving ? 'Submitting…' : 'Submit'}</button>
-          <button type="button" className="btn-secondary" onClick={() => setLines([emptyLine()])}>Clear</button>
+          <button type="button" className="btn-secondary" onClick={() => { setLines([emptyLine()]); setAdmission(null); }}>Clear</button>
         </div>
       </Section>
+
+      {showPatientModal && (
+        <PatientSearchModal 
+          onClose={() => setShowPatientModal(false)} 
+          onSelect={(patient) => {
+            setAdmission(patient)
+            setShowPatientModal(false)
+          }} 
+        />
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// Patient Search Modal
+// ============================================================
+function PatientSearchModal({ onClose, onSelect }) {
+  const [search, setSearch] = useState('')
+  const [patients, setPatients] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setLoading(true)
+      api.get('/ip-registrations', { params: { search, page, limit: 10 } })
+        .then((res) => {
+          // Handle both paginated {data: [...]} and bare array responses
+          const list = Array.isArray(res.data) ? res.data : (res.data?.data ?? [])
+          setPatients(list)
+        })
+        .catch(() => setPatients([]))
+        .finally(() => setLoading(false))
+    }, 300)
+    return () => clearTimeout(t)
+  }, [search, page])
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
+      <div className="bg-white rounded-sm shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+        
+        <div className="flex justify-between items-center px-4 py-3 border-b border-gray-200 bg-gray-50">
+          <h2 className="text-lg font-semibold text-gray-800">Select Admitted Patient</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
+        </div>
+
+        <div className="p-4 border-b border-gray-200 flex justify-end">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Search:</span>
+            <input 
+              className="border border-gray-300 rounded-sm px-3 py-1.5 w-64 focus:outline-none focus:border-[#5B9BD5]"
+              value={search}
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="MR No, IP No, or Name..."
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-auto">
+          <table className="w-full text-left text-sm whitespace-nowrap">
+            <thead className="bg-[#5B9BD5] text-white sticky top-0 z-10">
+              <tr>
+                <th className="px-4 py-3 font-medium">MR Number</th>
+                <th className="px-4 py-3 font-medium">Patient Reg No.</th>
+                <th className="px-4 py-3 font-medium">Name</th>
+                <th className="px-4 py-3 font-medium">Gender</th>
+                <th className="px-4 py-3 font-medium">Age</th>
+                <th className="px-4 py-3 font-medium">Phone</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {loading ? (
+                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+              ) : patients.length === 0 ? (
+                <tr><td colSpan="6" className="px-4 py-8 text-center text-gray-500">No patients found.</td></tr>
+              ) : (
+                patients.map((p) => (
+                  <tr 
+                    key={p.id} 
+                    className="hover:bg-blue-50 cursor-pointer transition-colors"
+                    onClick={() => onSelect(p)}
+                  >
+                    <td className="px-4 py-2.5 text-gray-800">{p.mr_number}</td>
+                    <td className="px-4 py-2.5 text-gray-800">{p.ip_reg_no}</td>
+                    <td className="px-4 py-2.5 text-gray-800 font-medium">{p.name}</td>
+                    <td className="px-4 py-2.5">{p.gender}</td>
+                    <td className="px-4 py-2.5">{p.age}</td>
+                    <td className="px-4 py-2.5">{p.mobile}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-4 py-3 border-t border-gray-200 bg-gray-50 flex justify-between items-center text-sm text-gray-600">
+          <span>Showing page {page}</span>
+          <div className="flex gap-2">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="px-3 py-1 border border-gray-300 rounded-sm bg-white disabled:opacity-50">« Prev</button>
+            <button onClick={() => setPage(p => p + 1)} className="px-3 py-1 border border-gray-300 rounded-sm bg-white hover:bg-gray-100">Next »</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

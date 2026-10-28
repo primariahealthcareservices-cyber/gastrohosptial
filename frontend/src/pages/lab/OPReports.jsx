@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Search, Eye, Pencil, Save, X } from 'lucide-react'
+import { Search, Eye, Pencil, Save, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import api from '../../api/axios'
 import { PageHeader, StatusBadge } from '../../components/PageHeader'
+
+const ITEMS_PER_PAGE = 30
 
 export default function OPReports() {
   const [reports, setReports] = useState([])
@@ -10,6 +12,9 @@ export default function OPReports() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [status, setStatus] = useState('')
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1)
 
   // View modal
   const [selectedReport, setSelectedReport] = useState(null)
@@ -24,6 +29,19 @@ export default function OPReports() {
   const [entryError, setEntryError] = useState('')
 
   // ------------------------------------------------------------
+  // PAGINATION DERIVED VALUES
+  // ------------------------------------------------------------
+  const totalPages = Math.max(1, Math.ceil(reports.length / ITEMS_PER_PAGE))
+  const safePage = Math.min(currentPage, totalPages)
+  const startIndex = (safePage - 1) * ITEMS_PER_PAGE
+  const paginatedReports = reports.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+
+  // Keep currentPage in range if data shrinks
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages)
+  }, [totalPages, currentPage])
+
+  // ------------------------------------------------------------
   // LIST
   // ------------------------------------------------------------
   const fetchReports = async () => {
@@ -36,6 +54,7 @@ export default function OPReports() {
       if (status) params.append('status', status)
       const { data } = await api.get(`/lab-reports/op?${params.toString()}`)
       setReports(data || [])
+      setCurrentPage(1) // reset to first page on new fetch
     } catch (err) {
       console.error(err)
     } finally {
@@ -50,6 +69,7 @@ export default function OPReports() {
 
   const handleFilter = (e) => {
     e.preventDefault()
+    setCurrentPage(1)
     fetchReports()
   }
 
@@ -58,6 +78,7 @@ export default function OPReports() {
     setStartDate('')
     setEndDate('')
     setStatus('')
+    setCurrentPage(1)
     setTimeout(fetchReports, 0)
   }
 
@@ -147,6 +168,31 @@ export default function OPReports() {
     }
   }
 
+  // ------------------------------------------------------------
+  // PAGINATION HANDLERS
+  // ------------------------------------------------------------
+  const goToPage = (page) => {
+    const p = Math.max(1, Math.min(page, totalPages))
+    setCurrentPage(p)
+    // scroll table into view
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // ------------------------------------------------------------
+  // PAGE NUMBERS (window of up to 5)
+  // ------------------------------------------------------------
+  const getPageNumbers = () => {
+    const pages = []
+    const maxVisible = 5
+    let start = Math.max(1, safePage - Math.floor(maxVisible / 2))
+    let end = Math.min(totalPages, start + maxVisible - 1)
+    if (end - start + 1 < maxVisible) {
+      start = Math.max(1, end - maxVisible + 1)
+    }
+    for (let i = start; i <= end; i++) pages.push(i)
+    return pages
+  }
+
   // ============================================================
   // RENDER
   // ============================================================
@@ -217,57 +263,128 @@ export default function OPReports() {
       )}
 
       {!loading && reports.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="table-base">
-            <thead>
-              <tr>
-                <th>OPD No</th>
-                <th>Patient</th>
-                <th>MR No</th>
-                <th>Test Name</th>
-                <th>Status</th>
-                <th>Report Date</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reports.map((r) => (
-                <tr key={r.id}>
-                  <td>{r.opd_reg_no}</td>
-                  <td>{r.patient_name}</td>
-                  <td>{r.mr_number}</td>
-                  <td>{r.test_name}</td>
-                  <td>
-                    <StatusBadge status={r.status} />
-                  </td>
-                  <td>
-                    {r.report_date
-                      ? new Date(r.report_date).toLocaleDateString()
-                      : '—'}
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => openEntry(r)}
-                        title="Enter Result"
-                        className="text-blue-600 hover:text-blue-800"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => viewReport(r)}
-                        title="View"
-                        className="text-teal-600 hover:text-teal-800"
-                      >
-                        <Eye size={16} />
-                      </button>
-                    </div>
-                  </td>
+        <>
+          <div className="overflow-x-auto">
+            <table className="table-base">
+              <thead>
+                <tr>
+                  <th>OPD No</th>
+                  <th>Patient</th>
+                  <th>MR No</th>
+                  <th>Test Name</th>
+                  <th>Status</th>
+                  <th>Report Date</th>
+                  <th>Actions</th>
                 </tr>
+              </thead>
+              <tbody>
+                {paginatedReports.map((r) => (
+                  <tr key={r.id}>
+                    <td>{r.opd_reg_no}</td>
+                    <td>{r.patient_name}</td>
+                    <td>{r.mr_number}</td>
+                    <td>{r.test_name}</td>
+                    <td>
+                      <StatusBadge status={r.status} />
+                    </td>
+                    <td>
+                      {r.report_date
+                        ? new Date(r.report_date).toLocaleDateString()
+                        : '—'}
+                    </td>
+                    <td>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEntry(r)}
+                          title="Enter Result"
+                          className="text-blue-600 hover:text-blue-800"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => viewReport(r)}
+                          title="View"
+                          className="text-teal-600 hover:text-teal-800"
+                        >
+                          <Eye size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* ---------------- PAGINATION ---------------- */}
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+            <div className="text-sm text-ink/60">
+              Showing <strong>{startIndex + 1}</strong>–
+              <strong>{Math.min(startIndex + ITEMS_PER_PAGE, reports.length)}</strong>{' '}
+              of <strong>{reports.length}</strong> reports
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => goToPage(safePage - 1)}
+                disabled={safePage === 1}
+                className="px-2 py-1 rounded border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50 flex items-center gap-1"
+              >
+                <ChevronLeft size={14} /> Prev
+              </button>
+
+              {getPageNumbers()[0] > 1 && (
+                <>
+                  <button
+                    onClick={() => goToPage(1)}
+                    className="px-3 py-1 rounded border border-gray-300 text-sm hover:bg-gray-50"
+                  >
+                    1
+                  </button>
+                  {getPageNumbers()[0] > 2 && (
+                    <span className="px-1 text-ink/40">…</span>
+                  )}
+                </>
+              )}
+
+              {getPageNumbers().map((p) => (
+                <button
+                  key={p}
+                  onClick={() => goToPage(p)}
+                  className={`px-3 py-1 rounded border text-sm ${
+                    p === safePage
+                      ? 'bg-primary text-white border-primary'
+                      : 'border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  {p}
+                </button>
               ))}
-            </tbody>
-          </table>
-        </div>
+
+              {getPageNumbers().slice(-1)[0] < totalPages && (
+                <>
+                  {getPageNumbers().slice(-1)[0] < totalPages - 1 && (
+                    <span className="px-1 text-ink/40">…</span>
+                  )}
+                  <button
+                    onClick={() => goToPage(totalPages)}
+                    className="px-3 py-1 rounded border border-gray-300 text-sm hover:bg-gray-50"
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+
+              <button
+                onClick={() => goToPage(safePage + 1)}
+                disabled={safePage === totalPages}
+                className="px-2 py-1 rounded border border-gray-300 text-sm disabled:opacity-40 hover:bg-gray-50 flex items-center gap-1"
+              >
+                Next <ChevronRight size={14} />
+              </button>
+            </div>
+          </div>
+        </>
       )}
 
       {/* ---------------- VIEW MODAL ---------------- */}

@@ -65,6 +65,44 @@ import InventoryType from './pages/pharmacy/masters/InventoryType'
 import ItemType from './pages/pharmacy/masters/ItemType'
 import ManufacturerMaster from './pages/pharmacy/ManufacturerMaster'
 import PurchaseOrder from './pages/pharmacy/PurchaseOrder'
+import ItemStock from './pages/pharmacy/ItemStock'
+
+// REPORTS IMPORTS
+import TotalSalesReport from './pages/pharmacy/reports/TotalSalesReport'
+import PharmacyDueReceivedReport from './pages/pharmacy/reports/PharmacyDueReceivedReport'
+import SalesReturns from './pages/pharmacy/reports/SalesReturns'
+import OpIpSalesReport from './pages/pharmacy/reports/OpIpSalesReport'
+import OpIpDueReport from './pages/pharmacy/reports/OpIpDueReport'
+import PharmacyDueReport from './pages/pharmacy/reports/PharmacyDueReport'
+import ScheduleItemReport from './pages/pharmacy/reports/ScheduleItemReport'
+import PurchasewiseItemReport from './pages/pharmacy/reports/PurchasewiseItemReport'
+import ProductWiseSalesReport from './pages/pharmacy/reports/ProductWiseSalesReport'
+import EmployeeSalesReport from './pages/pharmacy/reports/EmployeeSalesReport'
+import SalesReport from './pages/pharmacy/reports/SalesReport'
+import NewSalesReport from './pages/pharmacy/reports/NewSalesReport'
+import GrnReport from './pages/pharmacy/reports/GrnReport' 
+import GrnAdjustmentReport from './pages/pharmacy/reports/GrnAdjustmentReport'
+import ProfitReport from './pages/pharmacy/reports/ProfitReport'
+import PurchaseReport from './pages/pharmacy/reports/PurchaseReport'
+import StockReturnsReport from './pages/pharmacy/reports/StockReturnsReport'
+import SupplierWisePurchaseReport from './pages/pharmacy/reports/SupplierWisePurchaseReport'
+import GrnWisePurchaseReport from './pages/pharmacy/reports/GrnWisePurchaseReport'
+import OtIndentsReport from './pages/pharmacy/reports/OtIndentsReport'
+import DoctorSalesReport from './pages/pharmacy/reports/DoctorSalesReport'
+import DoctorWiseItemSalesReport from './pages/pharmacy/reports/DoctorWiseItemSalesReport'
+import PatientWiseSaleReport from './pages/pharmacy/reports/PatientWiseSaleReport'
+import ItemWiseSaleReport from './pages/pharmacy/reports/ItemWiseSaleReport'
+import InvoiceTaxReport from './pages/pharmacy/reports/InvoiceTaxReport'
+import PurchasePaymentsReport from './pages/pharmacy/reports/PurchasePaymentsReport'
+import StockAdjustmentReport from './pages/pharmacy/reports/StockAdjustmentReport'
+import NonMovingStockReport from './pages/pharmacy/reports/NonMovingStockReport'
+import MinimumStockReport from './pages/pharmacy/reports/MinimumStockReport'
+import SupplierWiseItemPurchase from './pages/pharmacy/reports/SupplierWiseItemPurchase'
+import InvoiceStatusReport from './pages/pharmacy/reports/InvoiceStatusReport'
+import ItemSaleTaxReport from './pages/pharmacy/reports/ItemSaleTaxReport'
+import UserWiseDiscountReport from './pages/pharmacy/reports/UserWiseDiscountReport'
+import GrnWiseSalesReport from './pages/pharmacy/reports/GrnWiseSalesReport'
+import StockLedgerReport from './pages/pharmacy/reports/StockLedgerReport' // <-- NEW IMPORT
 
 function withLayout(el) {
   return <Layout>{el}</Layout>
@@ -86,26 +124,28 @@ const PLACEHOLDERS = [
 ]
 
 const PHARMACY_PLACEHOLDERS = [
-  // Inventory Type, Item Type, Manufacturer, and Purchase Order now have real routes below
+  // Masters
   ['Tax Categories', '/pharmacy/masters/tax-categories'],
   ['Rack Master', '/pharmacy/masters/rack-master'],
   ['Item Master', '/pharmacy/masters/item-master'],
   ['Item Package Master', '/pharmacy/masters/item-package-master'],
   ['Drug Combination', '/pharmacy/masters/drug-combination'],
+  
+  // Transactions
   ['Stock Returns', '/pharmacy/transaction/stock-returns'],
+  
+  // Sales Returns
   ['Inpatient Sales Returns', '/pharmacy/sales-returns/inpatient'],
   ['Outpatient Sales Returns', '/pharmacy/sales-returns/outpatient'],
+  
+  // Others
   ['Duplicate Invoice', '/pharmacy/duplicate-invoice'],
-  ['Total Dues', '/pharmacy/reports/total-dues'],
-  ['Due Reported Sales', '/pharmacy/reports/due-reported-sales'],
-  ['Sales Returns Report', '/pharmacy/reports/sales-returns'],
-  ['OP/IP Sales Report', '/pharmacy/reports/op-ip-sales'],
-  ['OP/IP Due Report', '/pharmacy/reports/op-ip-due'],
-  ['Pharmacy Report', '/pharmacy/reports/pharmacy'],
-  ['Sales Report', '/pharmacy/reports/sales'],
   ['Due Collections', '/pharmacy/due-collections'],
-  ['Stock', '/pharmacy/stock'],
   ['Expenses', '/pharmacy/expenses'],
+
+  // Reports (Add all reports here that do not have real pages yet)
+  ['Total Sales', '/pharmacy/reports/total-sales'], 
+  // ['Stock Ledger', '/pharmacy/reports/stock-ledger'], <-- REMOVED THIS LINE
 ]
 
 const MASTER_PLACEHOLDERS = [
@@ -249,7 +289,7 @@ export default function App() {
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyDashboard />)}</ProtectedRoute>
         } />
 
-        {/* Real master pages (must come BEFORE placeholders so they win the match) */}
+        {/* Real master pages */}
         <Route path="/pharmacy/masters/inventory-type" element={
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InventoryType />)}</ProtectedRoute>
         } />
@@ -274,7 +314,154 @@ export default function App() {
           <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockAdjustments />)}</ProtectedRoute>
         } />
 
-        {/* Placeholders — anything not defined above falls into Coming Soon */}
+        {/* Real stock page */}
+        <Route path="/pharmacy/stock" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ItemStock />)}</ProtectedRoute>
+        } />
+
+        {/* Real reports pages (MUST be above the placeholder loop) */}
+        <Route path="/pharmacy/reports/total-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<TotalSalesReport />)}</ProtectedRoute>
+        } />
+        
+        <Route path="/pharmacy/reports/due-received" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyDueReceivedReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/sales-returns" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SalesReturns />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/op-ip-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OpIpSalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/op-ip-due" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OpIpDueReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/pharmacy-due" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyDueReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/schedule-item" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ScheduleItemReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/purchasewise-item" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PurchasewiseItemReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/product-wise-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ProductWiseSalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/employee-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<EmployeeSalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/new-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<NewSalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/grn" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GrnReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/grn-adjustment" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GrnAdjustmentReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/profit" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ProfitReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/purchase-payments" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PurchaseReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/stock-returns" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockReturnsReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/supplier-wise-purchase" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SupplierWisePurchaseReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/grn-wise-purchase" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GrnWisePurchaseReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/ot-indents" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<OtIndentsReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/doctor-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<DoctorSalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/doctor-wise-item-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<DoctorWiseItemSalesReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/patient-wise-sale" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PatientWiseSaleReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/item-wise-sale" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ItemWiseSaleReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/invoice-tax" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InvoiceTaxReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/purchase-payments" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PurchasePaymentsReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/stock-adjustment" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockAdjustmentReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/non-moving-stock" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<NonMovingStockReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/minimum-stock" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<MinimumStockReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/supplier-wise-item-purchase" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<SupplierWiseItemPurchase />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/invoice-status" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<InvoiceStatusReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/item-sale-tax" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<ItemSaleTaxReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/user-wise-discount" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<UserWiseDiscountReport />)}</ProtectedRoute>
+        } />
+
+        <Route path="/pharmacy/reports/grn-wise-sales" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<GrnWiseSalesReport />)}</ProtectedRoute>
+        } />
+
+        {/* NEW REAL STOCK LEDGER REPORT PAGE */}
+        <Route path="/pharmacy/reports/stock-ledger" element={
+          <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<StockLedgerReport />)}</ProtectedRoute>
+        } />
+
+        {/* Placeholders */}
         {PHARMACY_PLACEHOLDERS.map(([label, path]) => (
           <Route key={path} path={path} element={
             <ProtectedRoute roles={PHARMACY_ROLES}>{withPharmacyLayout(<PharmacyComingSoon title={label} />)}</ProtectedRoute>
@@ -303,9 +490,7 @@ export default function App() {
           <ProtectedRoute roles={['super_admin']}>{withLayout(<PermissionProfiles />)}</ProtectedRoute>
         } />
 
-        {/* ============================================================
-            LAB TECHNICIAN ROUTES
-            ============================================================ */}
+        {/* Lab technician routes */}
         <Route path="/lab" element={<LabLayout />}>
           <Route index element={<Navigate to="/lab/dashboard" replace />} />
           <Route path="dashboard" element={
