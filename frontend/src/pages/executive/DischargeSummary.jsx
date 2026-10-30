@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Printer, Save, XCircle, Eye, Plus, Trash2 } from 'lucide-react'
+import { Printer, Save, XCircle, Eye, Plus, Trash2, Pencil } from 'lucide-react'
 import api from '../../api/axios'
 import { PageHeader, Section } from '../../components/PageHeader'
 import DoctorSelect from '../../components/registration/DoctorSelect'
@@ -42,6 +42,7 @@ const emptySummary = {
 function AdmittedPatientList({ onSelect }) {
   const [patients, setPatients] = useState([])
   const [loading, setLoading] = useState(true)
+  const navigate = useNavigate()
 
   useEffect(() => {
     api.get('/ip-registrations', { params: { status: 'Admitted' } })
@@ -86,9 +87,18 @@ function AdmittedPatientList({ onSelect }) {
               <td>{p.bed_no || '—'}</td>
               <td>{formatDate(p.admitted_date)}</td>
               <td>{p.discharge_date ? formatDate(p.discharge_date) : '—'}</td>
-              <td>
-                <button onClick={() => onSelect(p.id)} className="text-teal-600 hover:underline flex items-center gap-1">
-                  <Eye size={14} /> View / Edit
+              <td className="flex gap-3">
+                <button
+                  onClick={() => navigate(`/executive/patient-overview/${p.id}`)}
+                  className="text-teal-600 hover:underline flex items-center gap-1"
+                >
+                  <Eye size={14} /> View
+                </button>
+                <button
+                  onClick={() => navigate(`/executive/discharge-summary/${p.id}`)}
+                  className="text-indigo-600 hover:underline flex items-center gap-1"
+                >
+                  <Pencil size={14} /> Edit Summary
                 </button>
               </td>
             </tr>

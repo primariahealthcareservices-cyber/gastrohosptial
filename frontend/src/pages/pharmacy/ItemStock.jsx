@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Search, X, Plus } from 'lucide-react';
+import { Search, X, Plus, Edit } from 'lucide-react';
 import { PageHeader } from '../../components/PageHeader';
 import { itemStockApi, supplierApi, manufacturerApi } from '../../api/axios';
 
@@ -14,6 +14,7 @@ export default function ItemStock() {
   const [total, setTotal] = useState(0);
 
   const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
 
   const fetchRows = async () => {
     setLoading(true);
@@ -48,6 +49,16 @@ export default function ItemStock() {
   const calcMargin = (r) => Number(r.new_mrp || 0) - calcEffExc(r);
   const calcMarginPct = (r) => Number(r.new_mrp) > 0 ? (calcMargin(r) / Number(r.new_mrp)) * 100 : 0;
 
+  const handleOpenAdd = () => {
+    setEditingItem(null);
+    setShowModal(true);
+  };
+
+  const handleOpenEdit = (row) => {
+    setEditingItem(row);
+    setShowModal(true);
+  };
+
   return (
     <div>
       <PageHeader title="Item Opening Stock" subtitle="Manage pharmacy stock" />
@@ -57,7 +68,7 @@ export default function ItemStock() {
         {/* Top Toolbar */}
         <div className="p-4 flex flex-wrap justify-between items-center gap-4 border-b border-gray-200">
           <div className="flex items-center gap-4 text-sm text-gray-600">
-            <button onClick={() => setShowModal(true)} className="flex items-center gap-2 px-4 py-2 bg-[#5B9BD5] hover:bg-[#4a8ac0] text-white rounded-sm font-medium">
+            <button onClick={handleOpenAdd} className="flex items-center gap-2 px-4 py-2 bg-[#5B9BD5] hover:bg-[#4a8ac0] text-white rounded-sm font-medium">
               <Plus size={16} /> Add New Stock Item
             </button>
           </div>
@@ -96,13 +107,18 @@ export default function ItemStock() {
                 <th className="px-2 py-3 font-medium">Supplier</th>
                 <th className="px-2 py-3 font-medium">Manufacturer</th>
                 <th className="px-2 py-3 font-medium">Doctor</th>
+                <th className="px-2 py-3 font-medium text-center">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 bg-white">
               {loading ? (
-                <tr><td colSpan="18" className="px-4 py-8 text-center text-gray-500">Loading...</td></tr>
+                <tr>
+                  <td colSpan="19" className="px-4 py-8 text-center text-gray-500">Loading...</td>
+                </tr>
               ) : rows.length === 0 ? (
-                <tr><td colSpan="18" className="px-4 py-8 text-center text-gray-500">No items found.</td></tr>
+                <tr>
+                  <td colSpan="19" className="px-4 py-8 text-center text-gray-500">No items found.</td>
+                </tr>
               ) : (
                 rows.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
@@ -124,6 +140,11 @@ export default function ItemStock() {
                     <td className="px-2 py-2 truncate max-w-[150px]" title={r.supplier_name}>{r.supplier_name || '—'}</td>
                     <td className="px-2 py-2">{r.manufacturer || '—'}</td>
                     <td className="px-2 py-2">{r.doctor_name || 'General'}</td>
+                    <td className="px-2 py-2 text-center">
+                      <button onClick={() => handleOpenEdit(r)} className="text-blue-500 hover:text-blue-700" title="Edit">
+                        <Edit size={16} />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -145,7 +166,8 @@ export default function ItemStock() {
       </div>
 
       {showModal && (
-        <AddStockModal 
+        <StockModal 
+          editingItem={editingItem}
           onClose={() => setShowModal(false)} 
           onSave={() => { setShowModal(false); fetchRows(); }} 
         />
@@ -155,9 +177,11 @@ export default function ItemStock() {
 }
 
 // ============================================================
-// Add Stock Modal
+// Add / Edit Stock Modal
 // ============================================================
-function AddStockModal({ onClose, onSave }) {
+function StockModal({ editingItem, onClose, onSave }) {
+  const isEditing = Boolean(editingItem);
+  
   const [form, setForm] = useState({
     item_name: '', hsn_code: '', batch_no: '', composition: '', drug_combination: '',
     item_type: '', pack: '', rack: '', purchase_date: '', exp_date: '',
@@ -174,7 +198,43 @@ function AddStockModal({ onClose, onSave }) {
   useEffect(() => {
     supplierApi.getAll({ limit: 500 }).then(res => setSuppliers(Array.isArray(res) ? res : (res?.data ?? []))).catch(() => {});
     manufacturerApi.getAll({ limit: 500 }).then(res => setManufacturers(Array.isArray(res) ? res : (res?.data ?? []))).catch(() => {});
-  }, []);
+    
+    // Helper to convert DB date string to YYYY-MM-DD
+    const formatDateForInput = (dateStr) => {
+      if (!dateStr) return '';
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return ''; // If invalid date, return empty
+      return d.toISOString().slice(0, 10); // Returns "YYYY-MM-DD"
+    };
+
+    // Populate form if editing
+    if (editingItem) {
+      setForm({
+        item_name: editingItem.item_name || '',
+        hsn_code: editingItem.hsn_code || '',
+        batch_no: editingItem.batch_no || '',
+        composition: editingItem.composition || '',
+        drug_combination: editingItem.drug_combination || '',
+        item_type: editingItem.item_type || '',
+        pack: editingItem.pack || '',
+        rack: editingItem.rack || '',
+        // FIXED: Use the helper function for dates
+        purchase_date: formatDateForInput(editingItem.purchase_date),
+        exp_date: formatDateForInput(editingItem.exp_date),
+        original_stock: editingItem.original_stock || '',
+        available_stock: editingItem.available_stock || '',
+        avg_monthly_usage: editingItem.avg_monthly_usage || '',
+        new_mrp: editingItem.new_mrp || '',
+        old_mrp: editingItem.old_mrp || '',
+        rate: editingItem.rate || '',
+        new_tax_percent: editingItem.new_tax_percent || '',
+        old_tax_percent: editingItem.old_tax_percent || '',
+        manufacturer: editingItem.manufacturer || '',
+        doctor_name: editingItem.doctor_name || '',
+        supplier_id: '' 
+      });
+    }
+  }, [editingItem]);
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -184,10 +244,14 @@ function AddStockModal({ onClose, onSave }) {
     setLoading(true);
     setError('');
     try {
-      await itemStockApi.create(form);
+      if (isEditing) {
+        await itemStockApi.update(editingItem.id, form);
+      } else {
+        await itemStockApi.create(form);
+      }
       onSave();
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to save');
+      setError(err.response?.data?.error || err.response?.data?.details || 'Failed to save');
     } finally {
       setLoading(false);
     }
@@ -197,12 +261,14 @@ function AddStockModal({ onClose, onSave }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-sm shadow-xl w-full max-w-5xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center px-6 py-3 border-b border-gray-200 bg-gray-50">
-          <h2 className="text-lg font-semibold text-gray-800">Add New Stock Entry</h2>
+          <h2 className="text-lg font-semibold text-gray-800">
+            {isEditing ? 'Edit Stock Entry' : 'Add New Stock Entry'}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700"><X size={20} /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6" autoComplete="off">
-          {error && <div className="mb-4 text-red-500 bg-red-50 p-2 rounded-sm">{error}</div>}
+          {error && <div className="mb-4 text-red-500 bg-red-50 p-2 rounded-sm border border-red-200">{error}</div>}
           
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="md:col-span-2">
@@ -304,7 +370,9 @@ function AddStockModal({ onClose, onSave }) {
 
           <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button type="button" onClick={onClose} className="px-4 py-2 bg-white border border-gray-300 rounded-sm">Cancel</button>
-            <button type="submit" disabled={loading} className="px-4 py-2 bg-[#5B9BD5] text-white rounded-sm">{loading ? 'Saving...' : 'Save Stock Entry'}</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 bg-[#5B9BD5] text-white rounded-sm">
+              {loading ? 'Saving...' : (isEditing ? 'Update Stock Entry' : 'Save Stock Entry')}
+            </button>
           </div>
         </form>
       </div>

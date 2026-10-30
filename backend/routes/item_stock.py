@@ -83,7 +83,6 @@ def list_stock():
     })
 
 
-# --- NEW ENDPOINT: Used by Purchase Order autocomplete ---
 @item_stock_bp.route("/all-names", methods=["GET"])
 @jwt_required()
 def all_stock_names():
@@ -100,7 +99,6 @@ def all_stock_names():
         many=True
     ) or []
     return jsonify(rows)
-# ---------------------------------------------------------
 
 
 @item_stock_bp.route("", methods=["POST"])
@@ -111,7 +109,6 @@ def create_stock_item():
     if not name:
         return jsonify({"error": "Item Name is required"}), 400
 
-    # Find a valid store_id or create a default one
     store_row = query("SELECT id FROM pharmacy_stores LIMIT 1")
     if store_row:
         store_id = store_row["id"]
@@ -120,41 +117,139 @@ def create_stock_item():
         store_row = query("SELECT id FROM pharmacy_stores LIMIT 1")
         store_id = store_row["id"]
 
-    query("""
-        INSERT INTO pharmacy_items (
-            store_id, name, batch_no, mrp, old_mrp, rate,
-            old_tax_percent, new_tax_percent, stock_qty, original_stock,
-            purchase_date, exp_date, hsn_code, manufacturer, item_type,
-            pack, rack, composition, drug_combination, avg_monthly_usage,
-            doctor_name, is_active
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s,
-            %s, %s, %s, %s,
-            %s, %s, %s, %s, %s,
-            %s, %s, %s, %s, %s,
-            %s, 1
-        )
-    """, (
-        store_id, name, 
-        data.get("batch_no") or None,
-        data.get("new_mrp") or 0,
-        data.get("old_mrp") or 0,
-        data.get("rate") or 0,
-        data.get("old_tax_percent") or 0,
-        data.get("new_tax_percent") or 0,
-        data.get("available_stock") or 0,
-        data.get("original_stock") or 0,
-        data.get("purchase_date") or None,
-        data.get("exp_date") or None,
-        data.get("hsn_code") or None,
-        data.get("manufacturer") or None,
-        data.get("item_type") or None,
-        data.get("pack") or None,
-        data.get("rack") or None,
-        data.get("composition") or None,
-        data.get("drug_combination") or None,
-        data.get("avg_monthly_usage") or 0,
-        data.get("doctor_name") or None
-    ), fetch=False, commit=True)
+    # Robust date formatter
+    def format_date(val):
+        if not val or str(val).strip() == "":
+            return None
+        val = str(val).strip()
+        if len(val) == 10 and val[4] == '-' and val[7] == '-':
+            return val
+        if 'T' in val:
+            return val[:10]
+        return None
 
-    return jsonify({"message": "Stock item added successfully"}), 201
+    def safe_num(val, default=0):
+        if val == "" or val is None:
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
+    try:
+        query("""
+            INSERT INTO pharmacy_items (
+                store_id, name, batch_no, mrp, old_mrp, rate,
+                old_tax_percent, new_tax_percent, stock_qty, original_stock,
+                purchase_date, exp_date, hsn_code, manufacturer, item_type,
+                pack, rack, composition, drug_combination, avg_monthly_usage,
+                doctor_name, is_active
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, 1
+            )
+        """, (
+            store_id, name, 
+            data.get("batch_no") or None,
+            safe_num(data.get("new_mrp")),
+            safe_num(data.get("old_mrp")),
+            safe_num(data.get("rate")),
+            safe_num(data.get("old_tax_percent")),
+            safe_num(data.get("new_tax_percent")),
+            safe_num(data.get("available_stock")),
+            safe_num(data.get("original_stock")),
+            format_date(data.get("purchase_date")),
+            format_date(data.get("exp_date")),
+            data.get("hsn_code") or None,
+            data.get("manufacturer") or None,
+            data.get("item_type") or None,
+            data.get("pack") or None,
+            data.get("rack") or None,
+            data.get("composition") or None,
+            data.get("drug_combination") or None,
+            safe_num(data.get("avg_monthly_usage")),
+            data.get("doctor_name") or None
+        ), fetch=False, commit=True)
+        return jsonify({"message": "Stock item added successfully"}), 201
+    except Exception as e:
+        print("\n--- DATABASE INSERT ERROR ---")
+        print(str(e))
+        print("-----------------------------\n")
+        return jsonify({"error": "Database error", "details": str(e)}), 500
+
+
+# --- UPDATE STOCK ITEM ---
+@item_stock_bp.route("/<int:item_id>", methods=["PUT"])
+@jwt_required()
+def update_stock_item(item_id):
+    data = request.get_json() or {}
+    name = (data.get("item_name") or "").strip()
+    if not name:
+        return jsonify({"error": "Item Name is required"}), 400
+
+    existing = query("SELECT id FROM pharmacy_items WHERE id=%s", (item_id,))
+    if not existing:
+        return jsonify({"error": "Item not found"}), 404
+
+    # Robust date formatter
+    def format_date(val):
+        if not val or str(val).strip() == "":
+            return None
+        val = str(val).strip()
+        if len(val) == 10 and val[4] == '-' and val[7] == '-':
+            return val
+        if 'T' in val:
+            return val[:10]
+        return None
+
+    def safe_num(val, default=0):
+        if val == "" or val is None:
+            return default
+        try:
+            return float(val)
+        except (ValueError, TypeError):
+            return default
+
+    try:
+        query("""
+            UPDATE pharmacy_items SET
+                name=%s, batch_no=%s, mrp=%s, old_mrp=%s, rate=%s,
+                old_tax_percent=%s, new_tax_percent=%s, stock_qty=%s, original_stock=%s,
+                purchase_date=%s, exp_date=%s, hsn_code=%s, manufacturer=%s, item_type=%s,
+                pack=%s, rack=%s, composition=%s, drug_combination=%s, avg_monthly_usage=%s,
+                doctor_name=%s
+            WHERE id=%s
+        """, (
+            name,
+            data.get("batch_no") or None,
+            safe_num(data.get("new_mrp")),
+            safe_num(data.get("old_mrp")),
+            safe_num(data.get("rate")),
+            safe_num(data.get("old_tax_percent")),
+            safe_num(data.get("new_tax_percent")),
+            safe_num(data.get("available_stock")),
+            safe_num(data.get("original_stock")),
+            format_date(data.get("purchase_date")),
+            format_date(data.get("exp_date")),
+            data.get("hsn_code") or None,
+            data.get("manufacturer") or None,
+            data.get("item_type") or None,
+            data.get("pack") or None,
+            data.get("rack") or None,
+            data.get("composition") or None,
+            data.get("drug_combination") or None,
+            safe_num(data.get("avg_monthly_usage")),
+            data.get("doctor_name") or None,
+            item_id
+        ), fetch=False, commit=True)
+
+        return jsonify({"message": "Stock item updated successfully"}), 200
+    
+    except Exception as e:
+        print("\n--- DATABASE UPDATE ERROR ---")
+        print(str(e))
+        print("-----------------------------\n")
+        return jsonify({"error": "Database error", "details": str(e)}), 500

@@ -1,4 +1,5 @@
 import axios from 'axios'
+
 const api = axios.create({
   baseURL: '/api',
 })
@@ -23,6 +24,7 @@ api.interceptors.response.use(
   }
 )
 
+// --- INVENTORY TYPES ---
 export const inventoryTypeApi = {
   getAll: async ({ search = '', page = 1, limit = 10 } = {}) => {
     const response = await api.get('/pharmacy/inventory-types', {
@@ -48,6 +50,7 @@ export const inventoryTypeApi = {
   },
 }
 
+// --- ITEM TYPES ---
 export const itemTypeApi = {
   getAll: async ({ search = '', page = 1, limit = 10 } = {}) => {
     const response = await api.get('/pharmacy/item-types', {
@@ -77,6 +80,7 @@ export const itemTypeApi = {
   },
 }
 
+// --- SUPPLIERS ---
 export const supplierApi = {
   getAll: async ({ search = '', page = 1, limit = 10 } = {}) => {
     const response = await api.get('/suppliers', {
@@ -102,6 +106,7 @@ export const supplierApi = {
   },
 }
 
+// --- MANUFACTURERS ---
 export const manufacturerApi = {
   getAll: async ({ search = '', page = 1, limit = 10 } = {}) => {
     const response = await api.get('/manufacturers', {
@@ -127,6 +132,7 @@ export const manufacturerApi = {
   },
 }
 
+// --- PURCHASE ORDERS ---
 export const purchaseOrderApi = {
   getAll: async ({ search = '', start_date, end_date, page = 1, limit = 10 } = {}) => {
     const response = await api.get('/purchase-orders', {
@@ -156,10 +162,10 @@ export const purchaseOrderApi = {
   },
 }
 
-// ---- Item Stock / Pharmacy Items API ----
+// --- ITEM STOCK ---
 export const itemApi = {
   getAllNames: async () => {
-    const response = await api.get('/item-stock/all-names')   // ← CHANGED URL
+    const response = await api.get('/item-stock/all-names')
     return response.data
   },
   search: async (search = '') => {
@@ -178,9 +184,15 @@ export const itemStockApi = {
   create: async (payload) => {
     const response = await api.post('/item-stock', payload)
     return response.data
+  },
+  // NEW: Update method
+  update: async (id, payload) => {
+    const response = await api.put(`/item-stock/${id}`, payload)
+    return response.data
   }
 }
-// Add this block inside the existing file (e.g., before export default api)
+
+// --- REPORTS ---
 export const totalSalesReportApi = {
   getSummary: async ({ start_date, end_date, include_expenses }) => {
     const response = await api.get('/reports/total-sales-summary', {
@@ -195,4 +207,5 @@ export const totalSalesReportApi = {
     return response.data
   }
 }
+
 export default api

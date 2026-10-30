@@ -6,7 +6,6 @@ pharmacy_item_types_bp = Blueprint("pharmacy_item_types", __name__)
 
 
 def _extract_total(count_row):
-    """Normalize a COUNT(*) result regardless of how db.query returns it."""
     if not count_row:
         return 0
     if isinstance(count_row, dict):
@@ -41,12 +40,9 @@ def list_item_types():
     except ValueError:
         limit = 10
 
-    if page < 1:
-        page = 1
-    if limit < 1:
-        limit = 10
-    if limit > 200:
-        limit = 200
+    if page < 1: page = 1
+    if limit < 1: limit = 10
+    if limit > 200: limit = 200
 
     offset = (page - 1) * limit
     like = f"%{search}%"
@@ -96,21 +92,25 @@ def create_item_type():
     if not inventory_type_id:
         return jsonify({"error": "Inventory Type is required"}), 400
 
-    existing = query(
-        "SELECT id FROM pharmacy_item_types "
-        "WHERE name=%s AND inventory_type_id=%s",
-        (name, inventory_type_id)
-    )
-    if existing:
-        return jsonify({"error": "Item Type already exists for this Inventory Type"}), 409
+    try:
+        existing = query(
+            "SELECT id FROM pharmacy_item_types "
+            "WHERE name=%s AND inventory_type_id=%s",
+            (name, inventory_type_id)
+        )
+        if existing:
+            return jsonify({"error": "Item Type already exists for this Inventory Type"}), 409
 
-    query(
-        "INSERT INTO pharmacy_item_types (name, inventory_type_id, is_active) "
-        "VALUES (%s, %s, %s)",
-        (name, inventory_type_id, is_active),
-        commit=True
-    )
-    return jsonify({"message": "Item Type added successfully"}), 201
+        query(
+            "INSERT INTO pharmacy_item_types (name, inventory_type_id, is_active) "
+            "VALUES (%s, %s, %s)",
+            (name, inventory_type_id, is_active),
+            commit=True
+        )
+        return jsonify({"message": "Item Type added successfully"}), 201
+    except Exception as e:
+        print("DB Error Create Item Type:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------- PUT: update ----------
@@ -127,25 +127,33 @@ def update_item_type(type_id):
     if not inventory_type_id:
         return jsonify({"error": "Inventory Type is required"}), 400
 
-    query(
-        "UPDATE pharmacy_item_types SET name=%s, inventory_type_id=%s, is_active=%s "
-        "WHERE id=%s",
-        (name, inventory_type_id, is_active, type_id),
-        commit=True
-    )
-    return jsonify({"message": "Item Type updated successfully"})
+    try:
+        query(
+            "UPDATE pharmacy_item_types SET name=%s, inventory_type_id=%s, is_active=%s "
+            "WHERE id=%s",
+            (name, inventory_type_id, is_active, type_id),
+            commit=True
+        )
+        return jsonify({"message": "Item Type updated successfully"})
+    except Exception as e:
+        print("DB Error Update Item Type:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------- DELETE: soft delete ----------
 @pharmacy_item_types_bp.route("/<int:type_id>", methods=["DELETE"])
 @jwt_required()
 def delete_item_type(type_id):
-    query(
-        "UPDATE pharmacy_item_types SET is_active=0 WHERE id=%s",
-        (type_id,),
-        commit=True
-    )
-    return jsonify({"message": "Item Type deleted successfully"})
+    try:
+        query(
+            "UPDATE pharmacy_item_types SET is_active=0 WHERE id=%s",
+            (type_id,),
+            commit=True
+        )
+        return jsonify({"message": "Item Type deleted successfully"})
+    except Exception as e:
+        print("DB Error Delete Item Type:", str(e))
+        return jsonify({"error": str(e)}), 500
 
 
 # ---------- GET: dropdown for the Add/Edit modal ----------
@@ -158,6 +166,7 @@ def inventory_types_dropdown():
         many=True
     ) or []
     return jsonify(rows)
+
 @pharmacy_item_types_bp.route("/all-names", methods=["GET"])
 @jwt_required()
 def all_item_type_names():

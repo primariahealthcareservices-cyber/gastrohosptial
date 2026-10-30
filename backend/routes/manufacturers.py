@@ -47,12 +47,9 @@ def list_manufacturers():
         limit = int(request.args.get("limit", 10) or 10)
     except ValueError:
         limit = 10
-    if page < 1:
-        page = 1
-    if limit < 1:
-        limit = 10
-    if limit > 200:
-        limit = 200
+    if page < 1: page = 1
+    if limit < 1: limit = 10
+    if limit > 200: limit = 200
 
     offset = (page - 1) * limit
 

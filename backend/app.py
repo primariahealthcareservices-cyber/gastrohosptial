@@ -5,107 +5,136 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from config import Config
+import importlib
 
-from routes.auth import auth_bp
-from routes.patients import patients_bp
-from routes.appointments import appointments_bp
-from routes.dashboard import dashboard_bp
-from routes.op_billing import op_billing_bp
-from routes.ip_billing import ip_billing_bp
-from routes.admissions import admissions_bp
-from routes.billing_management import billing_mgmt_bp
-from routes.reports import reports_bp
-from routes.users import users_bp
-from routes.doctors import doctors_bp
-from routes.departments import departments_bp
-from routes.referral_doctors import referral_doctors_bp
-from routes.op_registrations import op_reg_bp
-from routes.ip_registrations import ip_reg_bp
-from routes.patient_records import patient_records_bp
-from routes.room_occupancy import room_occupancy_bp
-from routes.direct_services import direct_services_bp
-from routes.catalog import catalog_bp
-from routes.pharmacy_items import pharmacy_items_bp
-from routes.pharmacy_sales import pharmacy_sales_bp
-from routes.patient_indents import patient_indents_bp
-from routes.ot_indents import ot_indents_bp
-from routes.advance_payments import advance_payments_bp
-from routes.ip_lab import ip_lab_bp
-from routes.ip_services import ip_services_bp
-from routes.ip_procedures import ip_procedures_bp
-from routes.discharge_summary import discharge_summary_bp
-from routes.op_lab import op_lab_bp
-from routes.op_services import op_services_bp
-from routes.op_procedures import op_procedures_bp
-from routes.grn import grn_bp
-from routes.stock_adjustments import stock_adj_bp
-from routes.suppliers import suppliers_bp
-from routes.permissions import permissions_bp
-from routes.lab_reports import lab_reports_bp
-from routes.lab_tests import lab_tests_bp
-from routes.lab_attributes import lab_attributes_bp
-from routes.bulk_import import bulk_import_bp
-from routes.pharmacy_inventory_types import pharmacy_inventory_types_bp
-from routes.pharmacy_item_types import pharmacy_item_types_bp
-from routes.manufacturers import manufacturers_bp
-from routes.purchase_orders import purchase_orders_bp
-from routes.item_stock import item_stock_bp
 DEBUG = os.getenv("FLASK_ENV", "development") == "development"
+
+
+# ============================================================
+# Safe blueprint loader
+# ============================================================
+def _load_blueprint(module_name, bp_name, prefix, required=False):
+    """
+    Import a blueprint module safely.
+
+    - If the module or the blueprint attribute is missing:
+        * required=True  → raise (so you know a critical file is gone)
+        * required=False → print [SKIP] and return None
+    - Otherwise return (blueprint, prefix)
+    """
+    try:
+        mod = importlib.import_module(module_name)
+    except ModuleNotFoundError as e:
+        if required:
+            raise
+        print(f"[SKIP] Missing module: {module_name}  ({e})")
+        return None
+    try:
+        bp = getattr(mod, bp_name)
+    except AttributeError as e:
+        if required:
+            raise
+        print(f"[SKIP] Module '{module_name}' has no attribute '{bp_name}'  ({e})")
+        return None
+    return (bp, prefix)
+
+
+# ============================================================
+# Blueprint manifest
+# ============================================================
+# required=True  → Flask will crash loudly if it's missing (fix the file)
+# required=False → Flask will print [SKIP] and continue
+
+BLUEPRINTS = [
+    # ---- core, must exist ----
+    ("routes.auth",                       "auth_bp",                       "/api/auth",                       True),
+    ("routes.patients",                   "patients_bp",                   "/api/patients",                   True),
+    ("routes.appointments",               "appointments_bp",               "/api/appointments",               True),
+    ("routes.dashboard",                  "dashboard_bp",                  "/api/dashboard",                  True),
+    ("routes.op_billing",                 "op_billing_bp",                 "/api/op-billing",                 True),
+    ("routes.ip_billing",                 "ip_billing_bp",                 "/api/ip-billing",                 True),
+    ("routes.admissions",                 "admissions_bp",                 "/api/admissions",                 True),
+    ("routes.billing_management",         "billing_mgmt_bp",               "/api/billing-management",         True),
+    ("routes.reports",                    "reports_bp",                    "/api/reports",                    True),
+    ("routes.users",                      "users_bp",                      "/api/users",                      True),
+    ("routes.permissions",                "permissions_bp",                "/api/permissions",                True),
+    ("routes.ip_registrations",           "ip_reg_bp",                     "/api/ip-registrations",           True),
+    ("routes.op_registrations",           "op_reg_bp",                     "/api/op-registrations",           True),
+    ("routes.patient_overview",           "patient_overview_bp",           "/api/patient-overview",           True),
+
+    # ---- everything else, optional ----
+    ("routes.doctors",                    "doctors_bp",                    "/api/doctors",                    False),
+    ("routes.departments",                "departments_bp",                "/api/departments",                False),
+    ("routes.referral_doctors",           "referral_doctors_bp",           "/api/referral-doctors",           False),
+    ("routes.patient_records",            "patient_records_bp",            "/api/patient-records",            False),
+    ("routes.room_occupancy",             "room_occupancy_bp",             "/api/room-occupancy",             False),
+    ("routes.direct_services",            "direct_services_bp",            "/api/direct-services",            False),
+    ("routes.catalog",                    "catalog_bp",                    "/api/catalog",                    False),
+    ("routes.pharmacy_items",             "pharmacy_items_bp",             "/api/pharmacy-items",             False),
+    ("routes.pharmacy_sales",             "pharmacy_sales_bp",             "/api/pharmacy-sales",             False),
+    ("routes.patient_indents",            "patient_indents_bp",            "/api/patient-indents",            False),
+    ("routes.ot_indents",                 "ot_indents_bp",                 "/api/ot-indents",                 False),
+    ("routes.advance_payments",           "advance_payments_bp",           "/api/advance-payments",           False),
+    ("routes.ip_lab",                     "ip_lab_bp",                     "/api/ip-lab",                     False),
+    ("routes.ip_services",                "ip_services_bp",                "/api/ip-services",                False),
+    ("routes.ip_procedures",              "ip_procedures_bp",              "/api/ip-procedures",              False),
+    ("routes.discharge_summary",          "discharge_summary_bp",          "/api/discharge-summary",          False),
+    ("routes.op_lab",                     "op_lab_bp",                     "/api/op-lab",                     False),
+    ("routes.op_services",                "op_services_bp",                "/api/op-services",                False),
+    ("routes.op_procedures",              "op_procedures_bp",              "/api/op-procedures",              False),
+    ("routes.grn",                        "grn_bp",                        "/api/grn",                        False),
+    ("routes.stock_adjustments",          "stock_adj_bp",                  "/api/stock-adjustments",          False),
+    ("routes.suppliers",                  "suppliers_bp",                  "/api/suppliers",                  False),
+    ("routes.lab_reports",                "lab_reports_bp",                "/api/lab-reports",                False),
+    ("routes.lab_tests",                  "lab_tests_bp",                  "/api/lab-tests",                  False),
+    ("routes.bulk_import",                "bulk_import_bp",                "/api/superadmin",                 False),
+    ("routes.manufacturers",              "manufacturers_bp",              "/api/manufacturers",              False),
+    ("routes.purchase_orders",            "purchase_orders_bp",            "/api/purchase-orders",            False),
+    ("routes.item_stock",                 "item_stock_bp",                 "/api/item-stock",                 False),
+
+    # ---- known missing files: keep them here so you can restore later ----
+    ("routes.lab_attributes",             "lab_attributes_bp",             "/api",                            False),
+    ("routes.pharmacy_inventory_types",   "pharmacy_inventory_types_bp",   "/api/pharmacy/inventory-types",   False),
+    ("routes.pharmacy_item_types",        "pharmacy_item_types_bp",        "/api/pharmacy/item-types",        False),
+]
 
 
 def create_app():
     app = Flask(__name__)
-    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024   # 50 MB
+    app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
     app.config["JWT_SECRET_KEY"] = Config.JWT_SECRET_KEY
     app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=8)
     app.config["DEBUG"] = DEBUG
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     JWTManager(app)
 
-    app.register_blueprint(auth_bp, url_prefix="/api/auth")
-    app.register_blueprint(patients_bp, url_prefix="/api/patients")
-    app.register_blueprint(appointments_bp, url_prefix="/api/appointments")
-    app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
-    app.register_blueprint(op_billing_bp, url_prefix="/api/op-billing")
-    app.register_blueprint(ip_billing_bp, url_prefix="/api/ip-billing")
-    app.register_blueprint(admissions_bp, url_prefix="/api/admissions")
-    app.register_blueprint(billing_mgmt_bp, url_prefix="/api/billing-management")
-    app.register_blueprint(reports_bp, url_prefix="/api/reports")
-    app.register_blueprint(doctors_bp, url_prefix="/api/doctors")
-    app.register_blueprint(departments_bp, url_prefix="/api/departments")
-    app.register_blueprint(referral_doctors_bp, url_prefix="/api/referral-doctors")
-    app.register_blueprint(op_reg_bp, url_prefix="/api/op-registrations")
-    app.register_blueprint(ip_reg_bp, url_prefix="/api/ip-registrations")
-    app.register_blueprint(patient_records_bp, url_prefix="/api/patient-records")
-    app.register_blueprint(room_occupancy_bp, url_prefix="/api/room-occupancy")
-    app.register_blueprint(pharmacy_inventory_types_bp, url_prefix="/api/pharmacy/inventory-types")
-    app.register_blueprint(pharmacy_item_types_bp, url_prefix="/api/pharmacy/item-types")
-    app.register_blueprint(direct_services_bp, url_prefix="/api/direct-services")
-    app.register_blueprint(users_bp, url_prefix="/api/users")
-    app.register_blueprint(pharmacy_items_bp, url_prefix="/api/pharmacy-items")
-    app.register_blueprint(catalog_bp, url_prefix="/api/catalog")
-    app.register_blueprint(pharmacy_sales_bp, url_prefix="/api/pharmacy-sales")
-    app.register_blueprint(patient_indents_bp, url_prefix="/api/patient-indents")
-    app.register_blueprint(ot_indents_bp, url_prefix="/api/ot-indents")
-    app.register_blueprint(advance_payments_bp, url_prefix="/api/advance-payments")
-    app.register_blueprint(ip_lab_bp, url_prefix="/api/ip-lab")
-    app.register_blueprint(ip_services_bp, url_prefix="/api/ip-services")
-    app.register_blueprint(ip_procedures_bp, url_prefix="/api/ip-procedures")
-    app.register_blueprint(discharge_summary_bp, url_prefix="/api/discharge-summary")
-    app.register_blueprint(op_lab_bp, url_prefix="/api/op-lab")
-    app.register_blueprint(op_services_bp, url_prefix="/api/op-services")
-    app.register_blueprint(op_procedures_bp, url_prefix="/api/op-procedures")
-    app.register_blueprint(grn_bp, url_prefix="/api/grn")
-    app.register_blueprint(stock_adj_bp, url_prefix="/api/stock-adjustments")
-    app.register_blueprint(permissions_bp, url_prefix="/api/permissions")
-    app.register_blueprint(suppliers_bp, url_prefix="/api/suppliers")
-    app.register_blueprint(purchase_orders_bp, url_prefix="/api/purchase-orders")
-    app.register_blueprint(manufacturers_bp, url_prefix="/api/manufacturers")
-    app.register_blueprint(lab_reports_bp, url_prefix="/api/lab-reports")
-    app.register_blueprint(lab_tests_bp, url_prefix="/api/lab-tests")
-    app.register_blueprint(lab_attributes_bp, url_prefix="/api")
-    app.register_blueprint(bulk_import_bp, url_prefix="/api/superadmin")
-    app.register_blueprint(item_stock_bp, url_prefix="/api/item-stock")
+    loaded = 0
+    skipped = 0
+    missing_required = []
+
+    for module_name, bp_name, prefix, required in BLUEPRINTS:
+        try:
+            result = _load_blueprint(module_name, bp_name, prefix, required=required)
+            if result:
+                bp, url_prefix = result
+                app.register_blueprint(bp, url_prefix=url_prefix)
+                loaded += 1
+            else:
+                skipped += 1
+        except ModuleNotFoundError:
+            missing_required.append((module_name, bp_name))
+
+    # If any REQUIRED module is missing, surface a clear message
+    if missing_required:
+        print("\n===============================================")
+        print("CRITICAL: These required route files are missing:")
+        for m, b in missing_required:
+            print(f"  ✗ {m}  (needs {b})")
+        print("Create each missing file under backend/routes/ and restart.")
+        print("===============================================\n")
+        raise RuntimeError("Required route modules are missing.")
+
+    print(f"\n[OK] {loaded} blueprints loaded, {skipped} optional skipped.\n")
 
     @app.route("/api/health")
     def health():

@@ -3,34 +3,35 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard, UserPlus, BedDouble, CalendarCheck, Receipt,
   FileBarChart, Ban, ChevronDown, ChevronRight, LogOut, Users, ShieldAlert,
-  ExternalLink, Settings, FlaskConical, // <-- Added FlaskConical for Lab icon
+  ExternalLink, Settings, FlaskConical, SlidersHorizontal,
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 
 const ALL_ROLES = ['executive', 'admin', 'super_admin']
+const LAB_ROLES = ['lab_technician', 'admin', 'super_admin']
 
 const NAV_TREE = [
   { type: 'link', label: 'Patient Registration', to: '/executive/patient-registration', icon: UserPlus, roles: ALL_ROLES },
-  { type: 'link', label: 'Appointments', to: '/executive/appointments', icon: CalendarCheck, roles: ALL_ROLES },
+  { type: 'link', label: 'Appointments',         to: '/executive/appointments',         icon: CalendarCheck, roles: ALL_ROLES },
   {
     type: 'group', key: 'billing', label: 'Billing', icon: Receipt, roles: ALL_ROLES,
     children: [
       {
         type: 'group', key: 'billing-ip', label: 'IP',
         children: [
-          { label: 'IP Billing', to: '/executive/ip-billing' },
-          { label: 'IP Advance', to: '/executive/ip-advance' },
-          { label: 'IP Lab', to: '/executive/ip-lab' },
-          { label: 'IP Services', to: '/executive/ip-services' },
+          { label: 'IP Billing',    to: '/executive/ip-billing' },
+          { label: 'IP Advance',    to: '/executive/ip-advance' },
+          { label: 'IP Lab',        to: '/executive/ip-lab' },
+          { label: 'IP Services',   to: '/executive/ip-services' },
           { label: 'IP Procedures', to: '/executive/ip-procedures' },
         ],
       },
       {
         type: 'group', key: 'billing-op', label: 'OP',
         children: [
-          { label: 'OP Billing', to: '/executive/op-billing' },
-          { label: 'OP Lab', to: '/executive/op-lab' },
-          { label: 'OP Services', to: '/executive/op-services' },
+          { label: 'OP Billing',    to: '/executive/op-billing' },
+          { label: 'OP Lab',        to: '/executive/op-lab' },
+          { label: 'OP Services',   to: '/executive/op-services' },
           { label: 'OP Procedures', to: '/executive/op-procedures' },
         ],
       },
@@ -39,66 +40,51 @@ const NAV_TREE = [
   {
     type: 'group', key: 'ip-admission', label: 'IP Admission', icon: BedDouble, roles: ALL_ROLES,
     children: [
-      { label: 'IP Details', to: '/executive/ip-details' },
-      { label: 'Admission', to: '/executive/admission' },
-      { label: 'Room Transfer', to: '/executive/room-transfer-approval' },
-      { label: 'Discharge Summary', to: '/executive/discharge-summary' },
+      { label: 'IP Details',         to: '/executive/ip-details' },
+      { label: 'Admission',          to: '/executive/admission' },
+      { label: 'Room Transfer',      to: '/executive/room-transfer-approval' },
+      { label: 'Discharge Summary',  to: '/executive/discharge-summary' },
     ],
   },
   {
     type: 'group', key: 'cancellations', label: 'Cancellations', icon: Ban, roles: ALL_ROLES,
     children: [
-      { label: 'OP Consultation Cancel', to: '/executive/cancellations/op-consultation' },
-      { label: 'OP Billing Cancel', to: '/executive/cancellations/op-billing' },
-      { label: 'OP Lab Cancel', to: '/executive/cancellations/op-lab' },
-      { label: 'OP Lab Modifications', to: '/executive/cancellations/op-lab-modifications' },
-      { label: 'IP Lab Cancellation', to: '/executive/cancellations/ip-lab' },
-      { label: 'OP Services Cancellation', to: '/executive/cancellations/op-services' },
-      { label: 'IP Billing Cancellation', to: '/executive/cancellations/ip-billing' },
-      { label: 'IP Surgery Cancel', to: '/executive/cancellations/ip-surgery' },
+      { label: 'OP Consultation Cancel',      to: '/executive/cancellations/op-consultation' },
+      { label: 'OP Billing Cancel',           to: '/executive/cancellations/op-billing' },
+      { label: 'OP Lab Cancel',               to: '/executive/cancellations/op-lab' },
+      { label: 'OP Lab Modifications',        to: '/executive/cancellations/op-lab-modifications' },
+      { label: 'IP Lab Cancellation',         to: '/executive/cancellations/ip-lab' },
+      { label: 'OP Services Cancellation',    to: '/executive/cancellations/op-services' },
+      { label: 'IP Billing Cancellation',     to: '/executive/cancellations/ip-billing' },
+      { label: 'IP Surgery Cancel',           to: '/executive/cancellations/ip-surgery' },
     ],
   },
   {
     type: 'group', key: 'reports', label: 'Reports', icon: FileBarChart, roles: ALL_ROLES,
     children: [
-      { label: 'Inpatient Lab Reports', to: '/executive/reports/ip-lab' },
-      { label: 'Outpatient Lab Reports', to: '/executive/reports/op-lab' },
-      { label: 'Inpatient Radiology Reports', to: '/executive/reports/ip-radiology' },
-      { label: 'Outpatient Radiology Reports', to: '/executive/reports/op-radiology' },
+      { label: 'Inpatient Lab Reports',         to: '/executive/reports/ip-lab' },
+      { label: 'Outpatient Lab Reports',        to: '/executive/reports/op-lab' },
+      { label: 'Inpatient Radiology Reports',   to: '/executive/reports/ip-radiology' },
+      { label: 'Outpatient Radiology Reports',  to: '/executive/reports/op-radiology' },
     ],
   },
-  // ============================================================
-  // MASTERS GROUP (only for super_admin)
-  // ============================================================
+  // Lab Technician section — all roles that can access lab
+  {
+    type: 'group', key: 'lab', label: 'Lab Technician', icon: FlaskConical, roles: LAB_ROLES,
+    children: [
+      { label: 'Lab Dashboard', to: '/lab/dashboard' },
+      { label: 'OP Reports',    to: '/lab/op-reports' },
+      { label: 'IP Reports',    to: '/lab/ip-reports' },
+      { label: 'Test Master',   to: '/lab/test-master' },
+    ],
+  },
   {
     type: 'group', key: 'masters', label: 'Masters', icon: Settings, roles: ['super_admin'],
     children: [
-      { label: 'Users', to: '/superadmin/users' },
-      { label: 'Permission Profiles', to: '/superadmin/permission-profiles' },
-      { label: 'Doctors', to: '/superadmin/doctors' },
-      { label: 'Specialization', to: '/superadmin/specializations' },
-      { label: 'Referral Marketing', to: '/superadmin/referral-marketing' },
-      { label: 'Company', to: '/superadmin/companies' },
-      { label: 'Discharge Form', to: '/superadmin/discharge-forms' },
-      { label: 'Procedures', to: '/superadmin/procedures' },
-      { label: 'Lab Test Category', to: '/superadmin/lab-test-categories' },
-      { label: 'Lab Test Attributes', to: '/superadmin/lab-test-attributes' },
-      { label: 'Lab Tests', to: '/superadmin/lab-tests' },
-      { label: 'Lab Packages', to: '/superadmin/lab-packages' },
-      { label: 'Lab Vendor', to: '/superadmin/lab-vendors' },
-      { label: 'Radiology', to: '/superadmin/radiology' },
-      { label: 'Radiology Departments', to: '/superadmin/radiology-departments' },
-      { label: 'Floors', to: '/superadmin/floors' },
-      { label: 'Rooms', to: '/superadmin/rooms' },
-      { label: 'Room Types', to: '/superadmin/room-types' },
-      { label: 'Equipment', to: '/superadmin/equipment' },
-      { label: 'Operation Theatre', to: '/superadmin/operation-theatres' },
-      { label: 'Insurance', to: '/superadmin/insurance' },
-      { label: 'File Upload', to: '/superadmin/file-upload' },
-      { label: 'Services', to: '/superadmin/services' },
-      { label: 'Certificates', to: '/superadmin/certificates' },
-      { label: 'Bulk Import/Export', to: '/superadmin/bulk-import' },
-      { label: 'Master Refund Request Reason', to: '/superadmin/refund-reasons' },
+      { label: 'Users',                   to: '/superadmin/users' },
+      { label: 'Discount & Permissions',  to: '/superadmin/discount-permissions' },
+      { label: 'Permission Profiles',     to: '/superadmin/permission-profiles' },
+      { label: 'Doctors',                 to: '/superadmin/doctors' },
     ],
   },
 ]
@@ -114,27 +100,30 @@ function flattenLinks(node) {
 }
 
 export default function Sidebar() {
-  const { user, logout } = useAuth()
+  const { user, logout, canAccess } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [openGroups, setOpenGroups] = useState({})
 
   if (!user) return null
 
-  const dashboardPath = user.role === 'super_admin' ? '/superadmin/dashboard'
-    : user.role === 'admin' ? '/admin/dashboard'
-    : user.role === 'lab_technician' ? '/lab/dashboard'
-    : '/executive/dashboard'
+  // Determine role-specific dashboards
+  const dashboardPath =
+    user.role === 'super_admin' ? '/superadmin/dashboard' :
+    user.role === 'admin'       ? '/admin/dashboard' :
+    user.role === 'lab_technician' ? '/lab/dashboard' :
+    user.role === 'pharmacy'    ? '/pharmacy/dashboard' :
+    '/executive/dashboard'
 
-  const billingManagementPath = user.role === 'executive' ? '/executive/billing-modifications' : '/admin/billing'
+  const billingManagementPath = user.role === 'executive'
+    ? '/executive/billing-modifications'
+    : '/admin/billing'
 
-  // Pharmacy is a fully separate module. Executives only ever see the
-  // executive sidebar/dashboard — no Pharmacy link. Admin and super_admin
-  // get everything, including Pharmacy.
-  const canSeePharmacyLink = user.role === 'admin' || user.role === 'super_admin'
-
-  // Lab Technician link - visible to admin, super_admin, and lab_technician
-  const canSeeLabLink = ['admin', 'super_admin', 'lab_technician'].includes(user.role)
+  // Visibility logic
+  const canSeePharmacyLink = user.role === 'super_admin' || (user.role === 'admin' && canAccess('/pharmacy/dashboard'))
+  const canSeeLabLink      = user.role === 'super_admin' || (user.role === 'admin' && canAccess('/lab/dashboard')) || user.role === 'lab_technician'
+  const canSeeUserManagement = user.role === 'super_admin'
+  const canSeeDiscountPermissions = user.role === 'super_admin'
 
   const toggleGroup = (key) => setOpenGroups((g) => ({ ...g, [key]: !g[key] }))
 
@@ -143,13 +132,13 @@ export default function Sidebar() {
       isActive ? 'bg-teal-50 text-teal-700 border-r-2 border-teal-600 font-medium' : 'text-ink/60 hover:bg-ink/5'
     }`
 
-  const handleLogout = () => {
-    logout()
-    navigate('/login', { replace: true })
-  }
+  const handleLogout = () => { logout(); navigate('/login', { replace: true }) }
 
   const renderNode = (node, depth, shaded) => {
     if (node.type === 'link') {
+      if (node.roles && !node.roles.includes(user.role)) return null
+      // If the user has explicit permissions, respect them (except super_admin)
+      if (user.role !== 'super_admin' && user.permissions?.length && !canAccess(node.to)) return null
       const Icon = node.icon
       return (
         <NavLink key={node.to} to={node.to} className={({ isActive }) => linkClass(isActive, depth)}>
@@ -160,6 +149,7 @@ export default function Sidebar() {
     }
 
     if (!node.type && node.to) {
+      if (user.role !== 'super_admin' && user.permissions?.length && !canAccess(node.to)) return null
       return (
         <NavLink
           key={node.to}
@@ -175,7 +165,18 @@ export default function Sidebar() {
       )
     }
 
-    const allLinks = flattenLinks(node)
+    // Groups: filter children
+    const visibleChildren = node.children
+      .map((child) => {
+        if (child.type === 'group') return child
+        if (child.to && user.role !== 'super_admin' && user.permissions?.length && !canAccess(child.to)) return null
+        return child
+      })
+      .filter(Boolean)
+
+    if (visibleChildren.length === 0) return null
+
+    const allLinks = visibleChildren.flatMap(flattenLinks)
     const isOpen = openGroups[node.key] ?? allLinks.some((to) => location.pathname === to)
     const GroupIcon = node.icon
     const isTopLevel = depth === 0
@@ -197,7 +198,7 @@ export default function Sidebar() {
         </button>
         {isOpen && (
           <div className={!shaded && isTopLevel ? 'bg-ink/[0.03]' : undefined}>
-            {node.children.map((child) => renderNode(child, depth + 1, shaded || isTopLevel))}
+            {visibleChildren.map((child) => renderNode(child, depth + 1, shaded || isTopLevel))}
           </div>
         )}
       </div>
@@ -217,12 +218,17 @@ export default function Sidebar() {
           Dashboard
         </NavLink>
 
-        {NAV_TREE.filter((n) => !n.roles || n.roles.includes(user.role)).map((node) => renderNode(node, 0, false))}
+        {NAV_TREE
+          .filter((n) => !n.roles || n.roles.includes(user.role))
+          .map((node) => renderNode(node, 0, false))}
 
-        <NavLink to={billingManagementPath} className={({ isActive }) => linkClass(isActive)}>
-          <ShieldAlert size={16} className="shrink-0" />
-          Billing Management
-        </NavLink>
+        {/* Billing management, only visible to admin/executive/super_admin */}
+        {['executive', 'admin', 'super_admin'].includes(user.role) && (
+          <NavLink to={billingManagementPath} className={({ isActive }) => linkClass(isActive)}>
+            <ShieldAlert size={16} className="shrink-0" />
+            Billing Management
+          </NavLink>
+        )}
 
         {canSeePharmacyLink && (
           <a
@@ -236,25 +242,17 @@ export default function Sidebar() {
           </a>
         )}
 
-        {/* Lab Technician link - separate from Pharmacy */}
-        {canSeeLabLink && (
-          <NavLink
-            to="/lab/dashboard"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-2.5 text-sm ${
-                isActive ? 'bg-teal-50 text-teal-700 border-r-2 border-teal-600 font-medium' : 'text-ink/60 hover:bg-ink/5'
-              }`
-            }
-          >
-            <FlaskConical size={16} className="shrink-0" />
-            Lab Technician
-          </NavLink>
-        )}
-
-        {user.role === 'super_admin' && (
+        {canSeeUserManagement && (
           <NavLink to="/superadmin/users" className={({ isActive }) => linkClass(isActive)}>
             <Users size={16} className="shrink-0" />
             User Management
+          </NavLink>
+        )}
+
+        {canSeeDiscountPermissions && (
+          <NavLink to="/superadmin/discount-permissions" className={({ isActive }) => linkClass(isActive)}>
+            <SlidersHorizontal size={16} className="shrink-0" />
+            Discount & Permissions
           </NavLink>
         )}
       </nav>
