@@ -61,7 +61,7 @@ BLUEPRINTS = [
     ("routes.ip_registrations",           "ip_reg_bp",                     "/api/ip-registrations",           True),
     ("routes.op_registrations",           "op_reg_bp",                     "/api/op-registrations",           True),
     ("routes.patient_overview",           "patient_overview_bp",           "/api/patient-overview",           True),
-
+        ("routes.doctor_dashboard",           "doctor_dashboard_bp",           "/api/doctor-dashboard",           False),
     # ---- everything else, optional ----
     ("routes.doctors",                    "doctors_bp",                    "/api/doctors",                    False),
     ("routes.departments",                "departments_bp",                "/api/departments",                False),

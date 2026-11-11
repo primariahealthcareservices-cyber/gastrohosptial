@@ -5,8 +5,9 @@ import { useAuth } from '../context/AuthContext'
  * ProtectedRoute
  *
  * - checks authentication
- * - checks role if `roles` is passed
- * - checks page permission if `path` is passed (super_admin bypasses)
+ * - a user passes if their role is in `roles` OR the page is explicitly
+ *   granted to them in `permissions` (so cross-department grants work)
+ * - if `path` is passed, the page must always be granted (super_admin bypasses)
  * - checks `requireAdmin` for admin-only dashboard pages
  */
 export default function ProtectedRoute({ roles, path, requireAdmin, children }) {
@@ -15,7 +16,10 @@ export default function ProtectedRoute({ roles, path, requireAdmin, children }) 
   if (loading) return null
   if (!user) return <Navigate to="/login" replace />
 
-  if (roles && !roles.includes(user.role)) {
+  const roleOk = !roles || roles.includes(user.role)
+  const granted = !!path && canAccess(path)
+
+  if (!roleOk && !granted) {
     return <Navigate to="/login" replace />
   }
 
@@ -23,8 +27,8 @@ export default function ProtectedRoute({ roles, path, requireAdmin, children }) 
     return <Navigate to="/login" replace />
   }
 
-  if (path) {
-    if (!canAccess(path)) return <Navigate to="/login" replace />
+  if (path && !granted) {
+    return <Navigate to="/login" replace />
   }
 
   return children

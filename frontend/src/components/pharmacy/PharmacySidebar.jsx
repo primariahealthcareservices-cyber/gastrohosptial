@@ -5,6 +5,7 @@ import {
   FileBarChart, Wallet, Package, Receipt, LogOut, ChevronDown, ChevronRight, Copy,
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import GrantedDepartments from '../GrantedDepartments'
 
 const NAV_TREE = [
   {
@@ -98,12 +99,16 @@ function flattenLinks(node) {
 }
 
 export default function PharmacySidebar() {
-  const { user, logout } = useAuth()
+  const { user, logout, canAccess } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [openGroups, setOpenGroups] = useState({})
 
   if (!user) return null
+
+  // Same rule as Sidebar.jsx: if explicit permissions exist, respect them
+  const restricted = user.role !== 'super_admin' && (user.permissions?.length || 0) > 0
+  const visible = (to) => !restricted || canAccess(to)
 
   const toggleGroup = (key) => setOpenGroups((g) => ({ ...g, [key]: !g[key] }))
 
@@ -117,8 +122,9 @@ export default function PharmacySidebar() {
     navigate('/login', { replace: true })
   }
 
-  const renderNode = (node) => {
+   const renderNode = (node) => {
     if (node.type === 'link') {
+      if (!visible(node.to)) return null
       const Icon = node.icon
       return (
         <NavLink key={node.to} to={node.to} className={({ isActive }) => linkClass(isActive)}>
@@ -128,7 +134,10 @@ export default function PharmacySidebar() {
       )
     }
 
-    const allLinks = flattenLinks(node)
+    const visibleChildren = node.children.filter((c) => visible(c.to))
+    if (visibleChildren.length === 0) return null
+
+    const allLinks = visibleChildren.map((c) => c.to)
     const isOpen = openGroups[node.key] ?? allLinks.some((to) => location.pathname === to)
     const GroupIcon = node.icon
 
@@ -147,7 +156,7 @@ export default function PharmacySidebar() {
         </button>
         {isOpen && (
           <div className="bg-ink/[0.03]">
-            {node.children.map((child) => (
+            {visibleChildren.map((child) => (
               <NavLink
                 key={child.to}
                 to={child.to}
@@ -172,16 +181,18 @@ export default function PharmacySidebar() {
         <p className="font-semibold text-sm">HMS Pharmacy</p>
         <p className="text-xs text-ink/40 mt-0.5 capitalize">{user.role.replace('_', ' ')}</p>
       </div>
-
       <nav className="flex-1 overflow-y-auto py-2">
-        <NavLink to="/pharmacy/dashboard" className={({ isActive }) => linkClass(isActive)}>
-          <LayoutDashboard size={16} className="shrink-0" />
-          Dashboard
-        </NavLink>
+        {visible('/pharmacy/dashboard') && (
+          <NavLink to="/pharmacy/dashboard" className={({ isActive }) => linkClass(isActive)}>
+            <LayoutDashboard size={16} className="shrink-0" />
+            Dashboard
+          </NavLink>
+        )}
 
         {NAV_TREE.map((node) => renderNode(node))}
-      </nav>
 
+        <GrantedDepartments exclude={['/pharmacy']} />
+      </nav>
       <div className="px-4 py-3 border-t border-border">
         <p className="text-xs text-ink/50 truncate mb-2">{user.email}</p>
         <button onClick={handleLogout} className="flex items-center gap-2 text-sm text-danger-500 hover:underline">

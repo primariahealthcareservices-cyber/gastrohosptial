@@ -21,6 +21,7 @@ export function dashboardPathForRole(role) {
     case 'lab_technician': return '/lab/dashboard'
     case 'pharmacy':    return '/pharmacy/dashboard'
     case 'executive':   return '/executive/dashboard'
+        case 'doctor':      return '/doctor/dashboard'
     default:            return '/login'
   }
 }

@@ -2,14 +2,14 @@ import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { LayoutDashboard, FileBarChart, FlaskConical, LogOut, Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-
+   import GrantedDepartments from '../GrantedDepartments'
 export default function LabSidebar() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
 
   if (!user) return null
-
+  
   const handleLogout = () => {
     logout()
     navigate('/login', { replace: true })
@@ -64,6 +64,8 @@ export default function LabSidebar() {
               {label}
             </NavLink>
           ))}
+
+          <GrantedDepartments exclude={['/lab']} className="-mx-3" />
         </nav>
 
         {/* Footer */}

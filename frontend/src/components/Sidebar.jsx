@@ -11,53 +11,58 @@ const ALL_ROLES = ['executive', 'admin', 'super_admin']
 const LAB_ROLES = ['lab_technician', 'admin', 'super_admin']
 
 const NAV_TREE = [
-  { type: 'link', label: 'Patient Registration', to: '/executive/patient-registration', icon: UserPlus, roles: ALL_ROLES },
-  { type: 'link', label: 'Appointments',         to: '/executive/appointments',         icon: CalendarCheck, roles: ALL_ROLES },
   {
-    type: 'group', key: 'billing', label: 'Billing', icon: Receipt, roles: ALL_ROLES,
+    type: 'group', key: 'executive', label: 'Executive', icon: Receipt, roles: ALL_ROLES,
     children: [
-      {
-        type: 'group', key: 'billing-ip', label: 'IP',
+      { label: 'Patient Registration', to: '/executive/patient-registration' },
+      { label: 'Appointments',         to: '/executive/appointments' },
+      { 
+        type: 'group', key: 'billing', label: 'Billing',
         children: [
-          { label: 'IP Billing',    to: '/executive/ip-billing' },
-          { label: 'IP Advance',    to: '/executive/ip-advance' },
-          { label: 'IP Lab',        to: '/executive/ip-lab' },
-          { label: 'IP Services',   to: '/executive/ip-services' },
-          { label: 'IP Procedures', to: '/executive/ip-procedures' },
+          { 
+            type: 'group', key: 'billing-ip', label: 'IP',
+            children: [
+              { label: 'IP Billing',    to: '/executive/ip-billing' },
+              { label: 'IP Advance',    to: '/executive/ip-advance' },
+              { label: 'IP Lab',        to: '/executive/ip-lab' },
+              { label: 'IP Services',   to: '/executive/ip-services' },
+              { label: 'IP Procedures', to: '/executive/ip-procedures' },
+            ],
+          },
+          { 
+            type: 'group', key: 'billing-op', label: 'OP',
+            children: [
+              { label: 'OP Billing',    to: '/executive/op-billing' },
+              { label: 'OP Lab',        to: '/executive/op-lab' },
+              { label: 'OP Services',   to: '/executive/op-services' },
+              { label: 'OP Procedures', to: '/executive/op-procedures' },
+            ],
+          },
         ],
       },
       {
-        type: 'group', key: 'billing-op', label: 'OP',
+        type: 'group', key: 'ip-admission', label: 'IP Admission',
         children: [
-          { label: 'OP Billing',    to: '/executive/op-billing' },
-          { label: 'OP Lab',        to: '/executive/op-lab' },
-          { label: 'OP Services',   to: '/executive/op-services' },
-          { label: 'OP Procedures', to: '/executive/op-procedures' },
+          { label: 'IP Details',         to: '/executive/ip-details' },
+          { label: 'Admission',          to: '/executive/admission' },
+          { label: 'Room Transfer',      to: '/executive/room-transfer-approval' },
+          { label: 'Discharge Summary',  to: '/executive/discharge-summary' },
         ],
       },
-    ],
-  },
-  {
-    type: 'group', key: 'ip-admission', label: 'IP Admission', icon: BedDouble, roles: ALL_ROLES,
-    children: [
-      { label: 'IP Details',         to: '/executive/ip-details' },
-      { label: 'Admission',          to: '/executive/admission' },
-      { label: 'Room Transfer',      to: '/executive/room-transfer-approval' },
-      { label: 'Discharge Summary',  to: '/executive/discharge-summary' },
-    ],
-  },
-  {
-    type: 'group', key: 'cancellations', label: 'Cancellations', icon: Ban, roles: ALL_ROLES,
-    children: [
-      { label: 'OP Consultation Cancel',      to: '/executive/cancellations/op-consultation' },
-      { label: 'OP Billing Cancel',           to: '/executive/cancellations/op-billing' },
-      { label: 'OP Lab Cancel',               to: '/executive/cancellations/op-lab' },
-      { label: 'OP Lab Modifications',        to: '/executive/cancellations/op-lab-modifications' },
-      { label: 'IP Lab Cancellation',         to: '/executive/cancellations/ip-lab' },
-      { label: 'OP Services Cancellation',    to: '/executive/cancellations/op-services' },
-      { label: 'IP Billing Cancellation',     to: '/executive/cancellations/ip-billing' },
-      { label: 'IP Surgery Cancel',           to: '/executive/cancellations/ip-surgery' },
-    ],
+      {
+        type: 'group', key: 'cancellations', label: 'Cancellations',
+        children: [
+          { label: 'OP Consultation Cancel',      to: '/executive/cancellations/op-consultation' },
+          { label: 'OP Billing Cancel',           to: '/executive/cancellations/op-billing' },
+          { label: 'OP Lab Cancel',               to: '/executive/cancellations/op-lab' },
+          { label: 'OP Lab Modifications',        to: '/executive/cancellations/op-lab-modifications' },
+          { label: 'IP Lab Cancellation',         to: '/executive/cancellations/ip-lab' },
+          { label: 'OP Services Cancellation',    to: '/executive/cancellations/op-services' },
+          { label: 'IP Billing Cancellation',     to: '/executive/cancellations/ip-billing' },
+          { label: 'IP Surgery Cancel',           to: '/executive/cancellations/ip-surgery' },
+        ],
+      },
+    ]
   },
   {
     type: 'group', key: 'reports', label: 'Reports', icon: FileBarChart, roles: ALL_ROLES,
@@ -68,7 +73,6 @@ const NAV_TREE = [
       { label: 'Outpatient Radiology Reports',  to: '/executive/reports/op-radiology' },
     ],
   },
-  // Lab Technician section — all roles that can access lab
   {
     type: 'group', key: 'lab', label: 'Lab Technician', icon: FlaskConical, roles: LAB_ROLES,
     children: [
@@ -90,8 +94,8 @@ const NAV_TREE = [
 ]
 
 const TOP_PADDING = ['px-4']
-const GROUP_HEADER_PADDING = ['px-4', 'pl-8 pr-4']
-const LEAF_PADDING = ['pl-11 pr-4', 'pl-11 pr-4', 'pl-16 pr-4']
+const GROUP_HEADER_PADDING = ['px-4', 'pl-8 pr-4', 'pl-12 pr-4']
+const LEAF_PADDING = ['pl-11 pr-4', 'pl-14 pr-4', 'pl-16 pr-4', 'pl-20 pr-4']
 
 function flattenLinks(node) {
   if (node.type === 'link') return [node.to]
@@ -107,23 +111,32 @@ export default function Sidebar() {
 
   if (!user) return null
 
-  // Determine role-specific dashboards
   const dashboardPath =
     user.role === 'super_admin' ? '/superadmin/dashboard' :
     user.role === 'admin'       ? '/admin/dashboard' :
     user.role === 'lab_technician' ? '/lab/dashboard' :
     user.role === 'pharmacy'    ? '/pharmacy/dashboard' :
+    user.role === 'doctor'      ? '/doctor/dashboard' :
     '/executive/dashboard'
 
   const billingManagementPath = user.role === 'executive'
     ? '/executive/billing-modifications'
     : '/admin/billing'
 
-  // Visibility logic
-  const canSeePharmacyLink = user.role === 'super_admin' || (user.role === 'admin' && canAccess('/pharmacy/dashboard'))
-  const canSeeLabLink      = user.role === 'super_admin' || (user.role === 'admin' && canAccess('/lab/dashboard')) || user.role === 'lab_technician'
+  const canSeePharmacyLink =
+    user.role === 'super_admin' ||
+    (user.role !== 'pharmacy' && (user.permissions || []).some((p) => p.startsWith('/pharmacy')))
+      
+  const canSeeLabLink = user.role === 'super_admin' || (user.role === 'admin' && canAccess('/lab/dashboard')) || user.role === 'lab_technician'
   const canSeeUserManagement = user.role === 'super_admin'
   const canSeeDiscountPermissions = user.role === 'super_admin'
+
+  const canSeeNode = (node) => {
+    if (user.role === 'super_admin') return true
+    if (node.roles && node.roles.includes(user.role)) return true
+    if (flattenLinks(node).some((to) => canAccess(to))) return true
+    return false
+  }
 
   const toggleGroup = (key) => setOpenGroups((g) => ({ ...g, [key]: !g[key] }))
 
@@ -134,11 +147,14 @@ export default function Sidebar() {
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }) }
 
-  const renderNode = (node, depth, shaded) => {
+  const renderNode = (node, depth, shaded, parentHasRole = false) => {
+    // 1. Handle top-level links
     if (node.type === 'link') {
-      if (node.roles && !node.roles.includes(user.role)) return null
-      // If the user has explicit permissions, respect them (except super_admin)
-      if (user.role !== 'super_admin' && user.permissions?.length && !canAccess(node.to)) return null
+      const hasRole = node.roles ? node.roles.includes(user.role) : false;
+      const isAllowed = user.role === 'super_admin' || hasRole || parentHasRole || canAccess(node.to);
+      
+      if (!isAllowed) return null;
+
       const Icon = node.icon
       return (
         <NavLink key={node.to} to={node.to} className={({ isActive }) => linkClass(isActive, depth)}>
@@ -148,8 +164,11 @@ export default function Sidebar() {
       )
     }
 
+    // 2. Handle leaf links
     if (!node.type && node.to) {
-      if (user.role !== 'super_admin' && user.permissions?.length && !canAccess(node.to)) return null
+      // If the parent group is ALL_ROLES, we show it. Otherwise, check canAccess.
+      if (user.role !== 'super_admin' && !parentHasRole && !canAccess(node.to)) return null;
+      
       return (
         <NavLink
           key={node.to}
@@ -165,19 +184,29 @@ export default function Sidebar() {
       )
     }
 
-    // Groups: filter children
+    // 3. Handle Groups
+    const groupHasRole = node.roles ? node.roles.includes(user.role) : false;
+    
+    // If this group allows the role, OR the parent allowed the role, we show everything inside.
+    const shouldShowAllChildren = user.role === 'super_admin' || groupHasRole || parentHasRole;
+
     const visibleChildren = node.children
       .map((child) => {
-        if (child.type === 'group') return child
-        if (child.to && user.role !== 'super_admin' && user.permissions?.length && !canAccess(child.to)) return null
-        return child
+        if (child.type === 'group') return child; 
+        
+        const childAllowed = shouldShowAllChildren || canAccess(child.to);
+        return childAllowed ? child : null;
       })
-      .filter(Boolean)
+      .filter(Boolean);
 
     if (visibleChildren.length === 0) return null
 
     const allLinks = visibleChildren.flatMap(flattenLinks)
-    const isOpen = openGroups[node.key] ?? allLinks.some((to) => location.pathname === to)
+    
+    // Automatically open if it's for their role, or if a child is active
+    const hasActiveChild = allLinks.some((to) => location.pathname === to);
+    const isOpen = openGroups[node.key] ?? (hasActiveChild || shouldShowAllChildren);
+
     const GroupIcon = node.icon
     const isTopLevel = depth === 0
 
@@ -196,9 +225,10 @@ export default function Sidebar() {
           </span>
           {isOpen ? <ChevronDown size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
         </button>
+        
         {isOpen && (
           <div className={!shaded && isTopLevel ? 'bg-ink/[0.03]' : undefined}>
-            {visibleChildren.map((child) => renderNode(child, depth + 1, shaded || isTopLevel))}
+            {visibleChildren.map((child) => renderNode(child, depth + 1, shaded || isTopLevel, shouldShowAllChildren))}
           </div>
         )}
       </div>
@@ -219,10 +249,9 @@ export default function Sidebar() {
         </NavLink>
 
         {NAV_TREE
-          .filter((n) => !n.roles || n.roles.includes(user.role))
-          .map((node) => renderNode(node, 0, false))}
+          .filter(canSeeNode)
+          .map((node) => renderNode(node, 0, false, false))}
 
-        {/* Billing management, only visible to admin/executive/super_admin */}
         {['executive', 'admin', 'super_admin'].includes(user.role) && (
           <NavLink to={billingManagementPath} className={({ isActive }) => linkClass(isActive)}>
             <ShieldAlert size={16} className="shrink-0" />

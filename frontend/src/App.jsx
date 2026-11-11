@@ -109,14 +109,15 @@ import ItemSaleTaxReport from './pages/pharmacy/reports/ItemSaleTaxReport'
 import UserWiseDiscountReport from './pages/pharmacy/reports/UserWiseDiscountReport'
 import GrnWiseSalesReport from './pages/pharmacy/reports/GrnWiseSalesReport'
 import StockLedgerReport from './pages/pharmacy/reports/StockLedgerReport'
-
+import DoctorLayout from './components/doctor/DoctorLayout'
+import DoctorDashboard from './pages/doctor/Dashboard'
 function withLayout(el) { return <Layout>{el}</Layout> }
 function withPharmacyLayout(el) { return <PharmacyLayout>{el}</PharmacyLayout> }
 
 const EXEC_ROLES = ['executive', 'admin', 'super_admin']
 const PHARMACY_ROLES = ['pharmacy', 'admin', 'super_admin']
 const LAB_ROLES = ['lab_technician', 'super_admin', 'admin']
-
+const DOCTOR_ROLES = ['doctor', 'admin', 'super_admin']
 const PLACEHOLDERS = [
   ['Inpatient Dashboard', '/executive/inpatient-dashboard'],
   ['Outpatient Dashboard', '/executive/outpatient-dashboard'],
@@ -154,7 +155,11 @@ export default function App() {
         <Route path="/superadmin/doctors" element={<ProtectedRoute roles={['super_admin']}>{withLayout(<DoctorMaster />)}</ProtectedRoute>} />
         <Route path="/superadmin/lab-tests" element={<ProtectedRoute roles={['super_admin']}>{withLayout(<LabTests />)}</ProtectedRoute>} />
         <Route path="/superadmin/bulk-import" element={<ProtectedRoute roles={['super_admin']}>{withLayout(<BulkImport />)}</ProtectedRoute>} />
-
+                {/* Doctor */}
+        <Route path="/doctor" element={<DoctorLayout />}>
+          <Route index element={<Navigate to="/doctor/dashboard" replace />} />
+          <Route path="dashboard" element={<ProtectedRoute roles={DOCTOR_ROLES} path="/doctor/dashboard"><DoctorDashboard /></ProtectedRoute>} />
+        </Route>
         {/* Admin */}
         <Route path="/admin/dashboard" element={<ProtectedRoute roles={['admin', 'super_admin']}>{withLayout(<AdminDashboard />)}</ProtectedRoute>} />
         <Route path="/admin/billing" element={<ProtectedRoute roles={['admin', 'super_admin']}>{withLayout(<AdminBillingManagement />)}</ProtectedRoute>} />

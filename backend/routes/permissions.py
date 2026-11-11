@@ -149,8 +149,9 @@ def get_menu():
                 {"label": "Product Wise Sales", "path": "/pharmacy/reports/product-wise-sales"},
                 {"label": "GRN Report", "path": "/pharmacy/reports/grn"},
                 {"label": "GRN Adjustment", "path": "/pharmacy/reports/grn-adjustment"},
-                {"label": "Profit Report", "path": "/pharmacy/reports/profit"},
+                                {"label": "Profit Report", "path": "/pharmacy/reports/profit"},
                 {"label": "Purchase Payments", "path": "/pharmacy/reports/purchase-payments"},
+                {"label": "Purchase Payments Report", "path": "/pharmacy/reports/purchase-payments-report"},
                 {"label": "Stock Returns", "path": "/pharmacy/reports/stock-returns"},
                 {"label": "Supplier Wise Purchase", "path": "/pharmacy/reports/supplier-wise-purchase"},
                 {"label": "GRN Wise Purchase", "path": "/pharmacy/reports/grn-wise-purchase"},
@@ -177,6 +178,13 @@ def get_menu():
                 {"label": "Lab Dashboard", "path": "/lab/dashboard"},
                 {"label": "OP Reports", "path": "/lab/op-reports"},
                 {"label": "IP Reports", "path": "/lab/ip-reports"},
+                {"label": "Test Master", "path": "/lab/test-master"},
+            ]
+        },
+                {
+            "label": "Doctor",
+            "children": [
+                {"label": "Doctor Dashboard", "path": "/doctor/dashboard"},
             ]
         },
         {
@@ -190,5 +198,18 @@ def get_menu():
                 {"label": "Bulk Import", "path": "/superadmin/bulk-import"},
             ]
         },
+        {
+    "label": "Cancellations",
+    "children": [
+        {"label": "OP Consultation Cancel", "path": "/executive/cancellations/op-consultation"},
+        {"label": "OP Billing Cancel", "path": "/executive/cancellations/op-billing"},
+        {"label": "OP Lab Cancel", "path": "/executive/cancellations/op-lab"},
+        {"label": "OP Lab Modifications", "path": "/executive/cancellations/op-lab-modifications"},
+        {"label": "IP Lab Cancellation", "path": "/executive/cancellations/ip-lab"},
+        {"label": "OP Services Cancellation", "path": "/executive/cancellations/op-services"},
+        {"label": "IP Billing Cancellation", "path": "/executive/cancellations/ip-billing"},
+        {"label": "IP Surgery Cancel", "path": "/executive/cancellations/ip-surgery"},
+    ]
+},
     ]
     return jsonify(menu)
