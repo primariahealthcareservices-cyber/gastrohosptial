@@ -14,9 +14,10 @@ def book_appointment():
     if not all(d.get(f) for f in required):
         return jsonify({"error": "patient_id, department_id, doctor_id, appointment_date are required"}), 400
 
-    appointment_no = next_code("APT", "appointments", "appointment_no")
-
-    # token number = count of bookings for that doctor/date + 1
+    row_no = query("""SELECT COALESCE(MAX(CAST(SUBSTRING(appointment_no, 4) AS UNSIGNED)), 0) AS n
+                  FROM appointments""")
+    next_n = int(row_no["n"]) + 1 if row_no else 1
+    appointment_no = f"APT{next_n:03d}"    # token number = count of bookings for that doctor/date + 1
     row = query("""SELECT COUNT(*) AS c FROM appointments
                     WHERE doctor_id=%s AND appointment_date=%s AND status != 'Cancelled'""",
                 (d["doctor_id"], d["appointment_date"]))

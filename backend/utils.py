@@ -13,7 +13,7 @@ def current_user_permissions():
     import json as _json
 
     uid = get_jwt_identity()
-    row = query("SELECT role, permissions FROM users WHERE id=%s", (uid,))
+    row = query("SELECT role, permissions FROM users WHERE id=%s", (uid,), many=False)
     if not row:
         return None
     if row.get("role") == "super_admin":
@@ -34,10 +34,6 @@ def permission_required(*prefixes):
         @permission_required("/pharmacy")
         @permission_required("/pharmacy/sales", "/pharmacy/reports")
         @permission_required("/executive")
-
-    A user has access if any of their stored permission paths
-    equals a prefix OR starts with `prefix + "/"`.
-    Super admin (permissions == ['*']) always passes.
     """
     def decorator(fn):
         @wraps(fn)
@@ -63,46 +59,45 @@ def permission_required(*prefixes):
             return fn(*args, **kwargs)
         return wrapper
     return decorator
+
+
 # ---------- code generation ----------
 
 def next_code(prefix, table, column):
     """
     Return the next sequential code for `table`.`column` with the given prefix.
-    e.g. next_code("PT", "patients", "patient_uid") -> "PT001"
+    e.g. next_code("PT", "patients", "patient_uid") -> "PT000002"
 
-    Scans existing values matching '<prefix>%', extracts the numeric suffix,
-    and returns prefix + (max + 1), zero-padded to 3 digits (or wider if
-    existing codes are already wider than 3 digits).
+    Uses SQL to extract only the numeric part, ensuring accurate max calculations
+    even if existing codes have different padding (like PT001 vs PT000001).
     """
     from db import query
 
-    rows = query(
-        f"SELECT {column} AS c FROM {table} WHERE {column} LIKE %s",
-        (f"{prefix}%",),
-    ) or []
+    # Use MySQL's SUBSTRING to remove the prefix characters and cast the rest to integer
+    # This handles 'PT001', 'PT000001', 'PT1' all as the same numeric base (1)
+    sql = f"""
+        SELECT MAX(CAST(SUBSTRING({column}, %s) AS UNSIGNED)) AS max_num
+        FROM {table}
+        WHERE {column} LIKE %s
+    """
+    # Prefix length + 1 (because MySQL SUBSTRING is 1-indexed)
+    prefix_len = len(prefix) + 1
+    like_pattern = f"{prefix}%"
 
-    max_n = 0
-    width = 3
-    for r in rows:
-        raw = (r.get("c") if isinstance(r, dict) else r[0]) or ""
-        digits = "".join(ch for ch in str(raw) if ch.isdigit())
-        if digits:
-            n = int(digits)
-            if n > max_n:
-                max_n = n
-            if len(digits) > width:
-                width = len(digits)
-    return f"{prefix}{max_n + 1:0{width}d}"
+    row = query(sql, (prefix_len, like_pattern), many=False)
+    
+    max_num = 0
+    if row and row.get("max_num") is not None:
+        max_num = int(row["max_num"])
+
+    # Generate the new code padded to 6 digits
+    return f"{prefix}{max_num + 1:06d}"
 
 
 # ---------- audit trail ----------
 def log_audit(user_id, action, entity=None, entity_id=None, details=None):
     """
     Insert a row into audit_logs.
-
-    Callers pass: (user_id, action, entity, entity_id[, details])
-    Mapped to table columns: entity -> module, entity_id -> reference_id,
-    details -> reason.
     """
     from db import query
     import json as _json
@@ -121,6 +116,8 @@ def log_audit(user_id, action, entity=None, entity_id=None, details=None):
     except Exception as e:
         # Auditing must never break the main request
         print(f"[AUDIT LOG FAILED] {e}")
+
+
 def role_required(*roles):
     """Allow only users whose JWT 'role' claim is in `roles`."""
     if len(roles) == 1 and isinstance(roles[0], (list, tuple, set)):

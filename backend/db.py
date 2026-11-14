@@ -11,14 +11,17 @@ def get_db():
         database=Config.DB_NAME,
     )
 
+# Alias so `from db import get_connection` (used in op_lab.py) works
+get_connection = get_db
+
 def query(sql, params=None, fetch=True, many=False, commit=False):
     """Run a query and return dict rows. Handles insert/update with commit."""
     conn = get_db()
-    cur = conn.cursor(dictionary=True)
+    cur = conn.cursor(dictionary=True, buffered=True)   # buffered: no more "Unread result found"
     try:
         cur.execute(sql, params or ())
         result = None
-        if fetch:
+        if fetch and cur.with_rows:
             result = cur.fetchall() if many else cur.fetchone()
         if commit:
             conn.commit()
@@ -30,4 +33,4 @@ def query(sql, params=None, fetch=True, many=False, commit=False):
         raise
     finally:
         cur.close()
-        conn.close()   # always close the connection
+        conn.close()

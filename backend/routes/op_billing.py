@@ -35,8 +35,6 @@ def create_bill():
         return jsonify({"error": "patient_id is required"}), 400
 
     # ── Compute gross total across every charge column ─────────────
-    # NOTE: `radiology_charge` was missing before and got silently
-    # dropped from `gross_total`. Now included.
     charges = [
         "consultation_charge", "lab_charge", "procedure_charge",
         "service_charge", "pharmacy_charge", "radiology_charge",
@@ -59,19 +57,22 @@ def create_bill():
     bill_no = next_code("OPB", "op_bills", "bill_no")
     user_id = get_jwt_identity()
 
+    # Link the bill to the exact OP registration (visit), if provided
+    op_registration_id = d.get("op_registration_id") or None
+
     bid = query(
         """
         INSERT INTO op_bills (
-            bill_no, patient_id, appointment_id,
+            bill_no, patient_id, op_registration_id, appointment_id,
             consultation_charge, lab_charge, procedure_charge,
             service_charge, pharmacy_charge, radiology_charge,
             gross_total, discount, net_total,
             paid_amount, due_amount, payment_mode, status, created_by
         )
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         """,
         (
-            bill_no, d["patient_id"], d.get("appointment_id"),
+            bill_no, d["patient_id"], op_registration_id, d.get("appointment_id"),
             d.get("consultation_charge", 0), d.get("lab_charge", 0),
             d.get("procedure_charge", 0), d.get("service_charge", 0),
             d.get("pharmacy_charge", 0), d.get("radiology_charge", 0),
@@ -99,14 +100,15 @@ def list_bills():
     patient_id = request.args.get("patient_id")
     page, per_page, offset = get_pagination_params()
 
+    # Use the registration stored on the bill; for older bills (NULL)
+    # fall back to the patient's most recent registration.
     base_from = """
         FROM op_bills b
         JOIN patients p ON p.id = b.patient_id
-        LEFT JOIN (
-            SELECT patient_id, MAX(opd_reg_no) AS opd_reg_no
-            FROM op_registrations
-            GROUP BY patient_id
-        ) r ON r.patient_id = p.id
+        LEFT JOIN op_registrations r ON r.id = COALESCE(
+            b.op_registration_id,
+            (SELECT MAX(r2.id) FROM op_registrations r2 WHERE r2.patient_id = b.patient_id)
+        )
         WHERE 1=1
     """
     params = []

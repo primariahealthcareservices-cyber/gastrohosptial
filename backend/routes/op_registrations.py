@@ -76,9 +76,9 @@ def create_op_registration():
         return jsonify({"error": "first_name, mobile and gender are required"}), 400
 
     village = blank_to_none(d.get("village"))
-    district = blank_to_none(d.get("district"))
-    if not village or not district:
-        return jsonify({"error": "village and district are required"}), 400
+    district = blank_to_none(d.get("district"))   # optional
+    if not village:
+        return jsonify({"error": "village is required"}), 400
 
     user_id = get_jwt_identity()
     full_name = f"{d.get('title', '')} {d.get('first_name')} {d.get('last_name', '')}".strip()

@@ -134,8 +134,8 @@ export default function OPRegistrationForm({ onCreated }) {
     e.preventDefault()
     setError('')
     if (!form.first_name || !form.mobile) return setError('First name and mobile are required')
-    if (!form.village.trim() || !form.district.trim()) return setError('Village and District are required')
-    setSaving(true)
+if (!form.village.trim()) return setError('Village is required')
+      setSaving(true)
     try {
       const { age, ...payload } = form
       const { data } = await api.post('/op-registrations', payload)
@@ -230,10 +230,10 @@ export default function OPRegistrationForm({ onCreated }) {
             <input className="input" required value={form.village} onChange={(e) => set('village', e.target.value)} />
           </div>
           <div><label className="label">Mandal</label><input className="input" value={form.mandal} onChange={(e) => set('mandal', e.target.value)} /></div>
-          <div>
-            <label className="label">District *</label>
-            <input className="input" required value={form.district} onChange={(e) => set('district', e.target.value)} />
-          </div>
+         <div>
+  <label className="label">District</label>
+  <input className="input" value={form.district} onChange={(e) => set('district', e.target.value)} />
+</div>
           <div><label className="label">State</label><input className="input" value={form.state} onChange={(e) => set('state', e.target.value)} /></div>
           <div><label className="label">Pincode</label><input className="input" value={form.pincode} onChange={(e) => set('pincode', e.target.value)} /></div>
           <div><label className="label">Street Address</label><input className="input" value={form.street_address} onChange={(e) => set('street_address', e.target.value)} /></div>

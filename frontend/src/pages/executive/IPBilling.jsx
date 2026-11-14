@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Receipt, FlaskConical, Stethoscope, Scissors } from 'lucide-react'
+import { Receipt, FlaskConical, Stethoscope, Scissors, X } from 'lucide-react'
 import api from '../../api/axios'
 import {
   PageHeader,
@@ -8,7 +8,7 @@ import {
 } from '../../components/PageHeader'
 import RoomChargeModal from '../../components/registration/RoomChargeModal'
 import CatalogPickerModal from '../../components/registration/CatalogPickerModal'
-import IPLab from '../../components/billing/IPLab'
+import IPBillingLabTab from '../../components/billing/IPBillingLabTab'
 import IPServices from '../../components/billing/IPServices'
 import IPProcedures from '../../components/billing/IPProcedures'
 
@@ -29,6 +29,56 @@ const CHARGE_ROWS = [
 
 const initCharges = Object.fromEntries(CHARGE_ROWS.map((c) => [c.key, 0]))
 
+const FILTERS = [
+  { key: 'today', label: 'Today' },
+  { key: 'yesterday', label: 'Yesterday' },
+  { key: 'week', label: 'This Week' },
+  { key: 'month', label: 'This Month' },
+  { key: 'custom', label: 'Custom' },
+]
+
+const fmt = (d) => {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+const getRange = (key, customFrom, customTo) => {
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  switch (key) {
+    case 'today':
+      return { from: fmt(today), to: fmt(today) }
+    case 'yesterday': {
+      const y = new Date(today)
+      y.setDate(y.getDate() - 1)
+      return { from: fmt(y), to: fmt(y) }
+    }
+    case 'week': {
+      const start = new Date(today)
+      const diff = (start.getDay() + 6) % 7
+      start.setDate(start.getDate() - diff)
+      return { from: fmt(start), to: fmt(today) }
+    }
+    case 'month':
+      return { from: fmt(new Date(today.getFullYear(), today.getMonth(), 1)), to: fmt(today) }
+    case 'custom':
+      return customFrom && customTo ? { from: customFrom, to: customTo } : null
+    default:
+      return null
+  }
+}
+
+const admissionDateOf = (a) => {
+  const raw = a.admission_date || a.admitted_at || a.admission_datetime || a.created_at
+  if (!raw) return null
+  const s = String(raw)
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10)
+  const d = new Date(s)
+  return Number.isNaN(d.getTime()) ? null : fmt(d)
+}
+
 export default function IPBilling() {
   const [admissions, setAdmissions] = useState([])
   const [admissionId, setAdmissionId] = useState('')
@@ -43,8 +93,15 @@ export default function IPBilling() {
   const [activePicker, setActivePicker] = useState(null)
   const [roomSelection, setRoomSelection] = useState(null)
   const [pickedItems, setPickedItems] = useState({ lab_charge: [], procedure_charge: [], service_charge: [] })
+  
+  const [labRefreshKey, setLabRefreshKey] = useState(0)
 
   const [activeTab, setActiveTab] = useState('bills')
+
+  const [activeFilter, setActiveFilter] = useState('')
+  const [customFrom, setCustomFrom] = useState(fmt(new Date()))
+  const [customTo, setCustomTo] = useState(fmt(new Date()))
+  const [showModal, setShowModal] = useState(false)
 
   const loadBills = () => {
     api.get('/ip-billing').then((r) => setBills(r.data))
@@ -66,6 +123,31 @@ export default function IPBilling() {
   const grandTotal = +discountedTotal.toFixed(2)
   const due = +Math.max(0, grandTotal - Number(advanceAdjusted || 0) - Number(paid || 0)).toFixed(2)
 
+  const range = getRange(activeFilter, customFrom, customTo)
+  const modalAdmissions = useMemo(() => {
+    if (!range) return []
+    return admissions.filter((a) => {
+      const d = admissionDateOf(a)
+      if (!d) return true
+      return d >= range.from && d <= range.to
+    })
+  }, [admissions, range?.from, range?.to])
+
+  const hasAdmissionDates = admissions.some((a) => admissionDateOf(a))
+  const rangeLabel = range ? (range.from === range.to ? range.from : `${range.from} → ${range.to}`) : ''
+  const selectedAdmission = admissions.find((a) => String(a.id) === String(admissionId)) || null
+
+  const pickFilter = (key) => {
+    setActiveFilter(key)
+    setShowModal(true)
+  }
+
+  const selectAdmission = (a) => {
+    setAdmissionId(String(a.id))
+    setError('')
+    setShowModal(false)
+  }
+
   const applyRoomCharge = (result) => {
     setCharges((current) => ({
       ...current,
@@ -78,9 +160,6 @@ export default function IPBilling() {
     setActivePicker(null)
   }
 
-  // ======================================================================
-  // UPDATED: Now saves items to the backend via POST, not just local state.
-  // ======================================================================
   const applyCatalogSelection = (chargeKey) => async (selectedList, total) => {
     if (!admissionId) {
       setError('Please select an admitted patient first.')
@@ -88,10 +167,7 @@ export default function IPBilling() {
       return
     }
 
-    // Map selected items to the format expected by the backend
-    // The modal should provide fields: investigation_name / service_name / procedure_name, rate, quantity
     const items = selectedList.map(item => ({
-      // For lab: item_name, services: service_name, procedures: procedure_name
       item_name: item.investigation_name || item.service_name || item.procedure_name || item.name,
       quantity: item.quantity || 1,
       rate: item.rate || 0,
@@ -108,22 +184,34 @@ export default function IPBilling() {
       await api.post(endpoint, {
         ip_registration_id: admissionId,
         items: items,
+        // Provide payment data so the backend doesn't crash
+        total_amount: total,
+        discount_percent: 0,
+        discount_amount: 0,
+        paid_amount: 0,
+        balance_amount: total,
+        discount_comments: 'NA',
+        paymode: 'Cash'
       })
 
-      // Update local charges (add the total to the specific charge field)
       setCharges((current) => ({
         ...current,
         [chargeKey]: Number(current[chargeKey] || 0) + total,
       }))
 
-      // Keep track of picked items for the summary chips
       setPickedItems((current) => ({
         ...current,
         [chargeKey]: [...current[chargeKey], ...selectedList],
       }))
 
       setActivePicker(null)
+      
+      if (chargeKey === 'lab_charge') {
+        setLabRefreshKey((k) => k + 1)
+      }
+      
     } catch (err) {
+      console.error(err)
       setError(err.response?.data?.error || 'Failed to save items')
       setActivePicker(null)
     }
@@ -162,21 +250,9 @@ export default function IPBilling() {
   const chipSummary = (key) => {
     const items = pickedItems[key]
     if (!items?.length) return null
-    const names = items
-      .map(
-        (i) =>
-          i.investigation_name ||
-          i.procedure_name ||
-          i.service_name ||
-          i.name
-      )
-      .filter(Boolean)
-      .join(', ')
+    const names = items.map((i) => i.investigation_name || i.procedure_name || i.service_name || i.name).filter(Boolean).join(', ')
     return (
-      <span
-        className="block text-xs text-teal-600 truncate max-w-[220px]"
-        title={names}
-      >
+      <span className="block text-xs text-teal-600 truncate max-w-[220px]" title={names}>
         {names}
       </span>
     )
@@ -186,10 +262,23 @@ export default function IPBilling() {
     <div>
       <PageHeader title="Inpatient Billing" subtitle="Create and manage IP bills" />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        {/* Left column – New Bill Form */}
         <form onSubmit={submit} className="xl:col-span-1">
           <Section title="New IP Bill">
             {error && <p className="text-sm text-danger-500 mb-3">{error}</p>}
+
+            <label className="label">Admitted Patients</label>
+            <div className="flex flex-wrap gap-1.5 mb-2">
+              {FILTERS.map((f) => (
+                <button
+                  type="button"
+                  key={f.key}
+                  onClick={() => pickFilter(f.key)}
+                  className={`text-xs px-3 py-1.5 rounded-sm border ${activeFilter === f.key ? 'bg-teal-600 text-white border-teal-600' : 'border-border text-ink/60 hover:bg-teal-50'}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
 
             <label className="label">Admitted Patient</label>
             <select className="input mb-3" value={admissionId} onChange={(e) => setAdmissionId(e.target.value)}>
@@ -200,6 +289,22 @@ export default function IPBilling() {
                 </option>
               ))}
             </select>
+
+            {selectedAdmission && (
+              <div className="border border-teal-600/30 bg-teal-50 rounded-sm px-3 py-2 mb-3 text-xs text-ink/70">
+                <div className="font-medium text-sm text-ink">{selectedAdmission.name}</div>
+                <div>
+                  {selectedAdmission.ip_reg_no}
+                  {selectedAdmission.patient_uid ? ` · ${selectedAdmission.patient_uid}` : ''}
+                  {selectedAdmission.age != null ? ` · ${selectedAdmission.age} yrs` : ''}
+                  {selectedAdmission.gender ? ` · ${selectedAdmission.gender}` : ''}
+                </div>
+                <div>
+                  Room {selectedAdmission.room_no || '—'} / Bed {selectedAdmission.bed_no || '—'}
+                  {admissionDateOf(selectedAdmission) ? ` · Admitted ${admissionDateOf(selectedAdmission)}` : ''}
+                </div>
+              </div>
+            )}
 
             {!admissions.length && (
               <p className="text-xs text-amber-600 mb-3">
@@ -279,45 +384,40 @@ export default function IPBilling() {
           </Section>
         </form>
 
-        {/* Right column – Tabs for Bills / Lab / Services / Procedures */}
         <div className="xl:col-span-2">
           <Section title="IP Records">
             <div className="flex border-b border-border mb-4">
               <button
+                type="button"
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === 'bills'
-                    ? 'text-teal-700 border-b-2 border-teal-700'
-                    : 'text-ink/50 hover:text-ink'
+                  activeTab === 'bills' ? 'text-teal-700 border-b-2 border-teal-700' : 'text-ink/50 hover:text-ink'
                 }`}
                 onClick={() => setActiveTab('bills')}
               >
                 <Receipt size={14} className="inline mr-1" /> IP Bills
               </button>
               <button
+                type="button"
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === 'lab'
-                    ? 'text-teal-700 border-b-2 border-teal-700'
-                    : 'text-ink/50 hover:text-ink'
+                  activeTab === 'lab' ? 'text-teal-700 border-b-2 border-teal-700' : 'text-ink/50 hover:text-ink'
                 }`}
                 onClick={() => setActiveTab('lab')}
               >
                 <FlaskConical size={14} className="inline mr-1" /> Lab
               </button>
               <button
+                type="button"
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === 'services'
-                    ? 'text-teal-700 border-b-2 border-teal-700'
-                    : 'text-ink/50 hover:text-ink'
+                  activeTab === 'services' ? 'text-teal-700 border-b-2 border-teal-700' : 'text-ink/50 hover:text-ink'
                 }`}
                 onClick={() => setActiveTab('services')}
               >
                 <Stethoscope size={14} className="inline mr-1" /> Services
               </button>
               <button
+                type="button"
                 className={`px-4 py-2 text-sm font-medium transition-colors ${
-                  activeTab === 'procedures'
-                    ? 'text-teal-700 border-b-2 border-teal-700'
-                    : 'text-ink/50 hover:text-ink'
+                  activeTab === 'procedures' ? 'text-teal-700 border-b-2 border-teal-700' : 'text-ink/50 hover:text-ink'
                 }`}
                 onClick={() => setActiveTab('procedures')}
               >
@@ -352,7 +452,15 @@ export default function IPBilling() {
                   </table>
                 </div>
               )}
-              {activeTab === 'lab' && <IPLab />}
+              
+              {activeTab === 'lab' && (
+                <IPBillingLabTab 
+                  patient={selectedAdmission} 
+                  admission={selectedAdmission} 
+                  refreshKey={labRefreshKey} 
+                />
+              )}
+              
               {activeTab === 'services' && <IPServices />}
               {activeTab === 'procedures' && <IPProcedures />}
             </div>
@@ -360,7 +468,99 @@ export default function IPBilling() {
         </div>
       </div>
 
-      {/* Modals */}
+      {showModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          onClick={() => setShowModal(false)}
+        >
+          <div
+            className="bg-white rounded-md shadow-xl w-full max-w-xl max-h-[85vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <div>
+                <h3 className="font-semibold text-sm">
+                  Admitted Patients · {FILTERS.find((f) => f.key === activeFilter)?.label}
+                </h3>
+                <p className="text-xs text-ink/50">
+                  {`${modalAdmissions.length} patient${modalAdmissions.length === 1 ? '' : 's'}${rangeLabel ? ` (${rangeLabel})` : ''}`}
+                </p>
+              </div>
+              <button type="button" onClick={() => setShowModal(false)} className="text-ink/50 hover:text-ink">
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-1.5 px-4 pt-3">
+              {FILTERS.map((f) => (
+                <button
+                  type="button"
+                  key={f.key}
+                  onClick={() => setActiveFilter(f.key)}
+                  className={`text-xs px-3 py-1.5 rounded-sm border ${activeFilter === f.key ? 'bg-teal-600 text-white border-teal-600' : 'border-border text-ink/60 hover:bg-teal-50'}`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {activeFilter === 'custom' && (
+              <div className="grid grid-cols-2 gap-3 px-4 pt-3">
+                <div>
+                  <label className="label">Start Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={customFrom}
+                    max={customTo || undefined}
+                    onChange={(e) => setCustomFrom(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label">End Date</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={customTo}
+                    min={customFrom || undefined}
+                    onChange={(e) => setCustomTo(e.target.value)}
+                  />
+                </div>
+              </div>
+            )}
+
+            {admissions.length > 0 && !hasAdmissionDates && (
+              <p className="text-xs text-amber-600 px-4 pt-3">
+                Admission dates are not available on these records, so all admitted patients are shown.
+              </p>
+            )}
+
+            <div className="p-4 overflow-y-auto">
+              {modalAdmissions.length === 0 ? (
+                <p className="text-sm text-ink/40 text-center py-8">No admitted patients found for this period</p>
+              ) : (
+                <div className="border border-border rounded-sm">
+                  {modalAdmissions.map((a) => (
+                    <button
+                      type="button"
+                      key={a.id}
+                      onClick={() => selectAdmission(a)}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-teal-50 border-b border-border last:border-0 ${String(admissionId) === String(a.id) ? 'bg-teal-50' : ''}`}
+                    >
+                      <div className="font-medium">{a.name}</div>
+                      <div className="text-xs text-ink/60">
+                        {a.ip_reg_no} · Room {a.room_no || '—'} / Bed {a.bed_no || '—'}
+                        {admissionDateOf(a) ? ` · Admitted ${admissionDateOf(a)}` : ''}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {activePicker === 'room' && (
         <RoomChargeModal
           initial={roomSelection}

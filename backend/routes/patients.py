@@ -77,28 +77,33 @@ def create_patient():
     patient = query("SELECT * FROM patients WHERE id=%s", (pid,))
     return jsonify(patient), 201
 
-
 @patients_bp.route("", methods=["GET"])
 @jwt_required()
 def list_patients():
     search = request.args.get("search", "")
+    from_date = request.args.get("from_date")
+    to_date = request.args.get("to_date")
     page = int(request.args.get("page", 1))
     limit = int(request.args.get("limit", 20))
     offset = (page - 1) * limit
 
     like = f"%{search}%"
-    rows = query(
-        """
+    sql = """
         SELECT * FROM patients
-        WHERE name LIKE %s OR phone LIKE %s OR patient_uid LIKE %s OR reg_no LIKE %s
-           OR email LIKE %s
-        ORDER BY id DESC LIMIT %s OFFSET %s
-        """,
-        (like, like, like, like, like, limit, offset),
-        many=True,
-    )
-    return jsonify(rows)
+        WHERE (name LIKE %s OR phone LIKE %s OR patient_uid LIKE %s
+               OR reg_no LIKE %s OR email LIKE %s)
+    """
+    params = [like, like, like, like, like]
 
+    if from_date and to_date:
+        sql += " AND DATE(created_at) BETWEEN %s AND %s"
+        params += [from_date, to_date]
+
+    sql += " ORDER BY id DESC LIMIT %s OFFSET %s"
+    params += [limit, offset]
+
+    rows = query(sql, tuple(params), many=True)
+    return jsonify(rows)
 
 @patients_bp.route("/<int:patient_id>/status", methods=["PATCH"])
 @jwt_required()

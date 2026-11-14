@@ -65,11 +65,10 @@ def create_ip_registration():
     d = request.get_json()
     if not d.get("first_name") or not d.get("mobile") or not d.get("gender"):
         return jsonify({"error": "first_name, mobile and gender are required"}), 400
-
     village = blank_to_none(d.get("village"))
-    district = blank_to_none(d.get("district"))
-    if not village or not district:
-        return jsonify({"error": "village and district are required"}), 400
+    district = blank_to_none(d.get("district"))   # optional
+    if not village:
+        return jsonify({"error": "village is required"}), 400
 
     user_id = get_jwt_identity()
     full_name = f"{d.get('title', '')} {d.get('first_name')} {d.get('last_name', '')}".strip()

@@ -94,13 +94,18 @@ export default function PatientSearchPicker({ onSelect }) {
       <label className="label">Existing Patient? Search by name, mobile, email or MR number</label>
       <div className="flex items-center gap-2">
         {loading ? <Loader2 size={14} className="text-ink/40 animate-spin" /> : <Search size={14} className="text-ink/40" />}
-        <input
-          className="input"
-          placeholder="Type name, mobile, email, or patient reg no (e.g. SGR000001)"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          onFocus={() => (results.length || error) && setOpen(true)}
-        />
+       <input
+  className="input"
+  placeholder="Type name, mobile, email, or patient reg no (e.g. SGR000001)"
+  value={q}
+  onChange={(e) => setQ(e.target.value)}
+  onFocus={() => (results.length || error) && setOpen(true)}
+  onBlur={() => setOpen(false)}
+  onKeyDown={(e) => {
+    if (e.key === 'Enter') e.preventDefault()
+    if (e.key === 'Escape') setOpen(false)
+  }}
+/>
       </div>
 
       {open && (
